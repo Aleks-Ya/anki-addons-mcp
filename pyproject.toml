@@ -61,6 +61,7 @@ packages = ["src/anki_addons_mcp"]
 [dependency-groups]
 dev = [
     "pytest",
+    "pytest-cov",
     "anyio",
     "ruff",
     "mypy",
