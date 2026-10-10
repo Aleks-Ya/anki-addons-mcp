@@ -19,72 +19,45 @@ catalog, enriched with GitHub, Anki Forum and AI-summary data, published as mont
 It answers questions such as "which addon does X?", "will it work on Anki 25.02?", "is it maintained?",
 and "what changed since last month?".
 
-## Run locally (STDIO)
+## Links
+- [Anki Addons dataset](https://huggingface.co/datasets/Ya-Alex/anki-addons) on HuggingFace
+- [anki-addons-dataset](https://github.com/Aleks-Ya/anki-addons-dataset), the pipeline that builds the dataset
+- [Developer Guide](README-DEV.md): running from sources, debugging, tests, architecture, deployment
+
+## Use it locally (STDIO)
+
+Requires [uv](https://docs.astral.sh/uv/). `uvx anki-addons-mcp` works once the package is published to
+PyPI; until then, run it from a checkout as described in [Run from sources](README-DEV.md#run-from-sources).
+
+Register the server in Claude Code:
 
 ```bash
-uvx anki-addons-mcp                       # once published to PyPI
-uv run anki-addons-mcp                    # from a checkout
+claude mcp add anki-addons -- uvx anki-addons-mcp
 ```
 
-Register in Claude Code:
+Other MCP clients use the same command (`uvx anki-addons-mcp`) in their server configuration, e.g.:
 
-```bash
-claude mcp add anki-addons -- uv --directory /path/to/anki-addons-mcp run anki-addons-mcp
+```json
+{
+  "mcpServers": {
+    "anki-addons": { "command": "uvx", "args": ["anki-addons-mcp"] }
+  }
+}
 ```
 
 The first start downloads the latest snapshot (~15 MB) into the HuggingFace cache. Older snapshots are
-downloaded on demand by history tools.
+downloaded on demand by history tools, so the first history question can take a minute.
 
-## Run remotely (Streamable HTTP)
+## Use it remotely (Streamable HTTP)
 
-```bash
-uv run anki-addons-mcp --transport http --host 0.0.0.0 --port 7860
-curl http://localhost:7860/healthz
-claude mcp add --transport http anki-addons http://localhost:7860/mcp
-```
-
-The HTTP transport runs stateless with JSON responses, so it survives restarts and needs no session
-affinity. On a HuggingFace Docker Space (this README carries the Space header) the endpoint is
-`https://<user>-anki-addons-mcp.hf.space/mcp`.
+Connect to a hosted instance (e.g. a HuggingFace Space) by URL:
 
 ```bash
-docker build -t anki-addons-mcp .
-docker run -p 7860:7860 anki-addons-mcp
+claude mcp add --transport http anki-addons https://<user>-anki-addons-mcp.hf.space/mcp
 ```
 
-## Debug with the MCP Inspector
-
-The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) needs Node.js (`npx`).
-
-**STDIO.** The Inspector launches the server itself:
-
-```bash
-npx @modelcontextprotocol/inspector uv run anki-addons-mcp
-npx @modelcontextprotocol/inspector uv --directory /path/to/anki-addons-mcp run anki-addons-mcp
-```
-
-Use the first command from the project directory and the second from anywhere else. The UI opens at
-`http://localhost:6274` with the transport set to STDIO. Click **Connect**, then use the **Tools**,
-**Resources** and **Prompts** tabs. Server logs (stderr) appear in the Inspector's server output pane.
-
-**Streamable HTTP.** Start the server, then connect the Inspector to it:
-
-```bash
-uv run anki-addons-mcp --transport http --port 8000
-npx @modelcontextprotocol/inspector
-```
-
-In the UI, set **Transport Type** to *Streamable HTTP* and **URL** to `http://localhost:8000/mcp`, then
-click **Connect**. For the Docker image, use `http://localhost:7860/mcp`.
-
-**Tips**
-- **Timeouts:** the first start downloads the latest snapshot (~15 MB). The first `get_addon_history` or
-  `diff_snapshots` call that needs older snapshots can take a minute or more. If a call times out, raise
-  **Request Timeout** in the Inspector's **Configuration** panel (e.g. `300000` ms). Later runs read the
-  files from the HF cache.
-- **Offline or faster startup:** serve a local copy of the dataset (`latest/` and `history/<date>/`):
-  `npx @modelcontextprotocol/inspector uv run anki-addons-mcp --backend local_parquet --data-dir /path/to/dataset`
-- **Less noise:** add `--refresh-interval 0` to turn off the hourly check for a new dataset revision.
+To host your own instance, see [Run over HTTP](README-DEV.md#run-over-http) and
+[Deploy to a HuggingFace Space](README-DEV.md#deploy-to-a-huggingface-space).
 
 ## Capabilities
 
@@ -122,27 +95,3 @@ CLI flags override environment variables (prefix `ANKI_MCP_`, also read from `.e
 | `ANKI_MCP_MAINTENANCE_ACTIVE_DAYS` / `_STALE_DAYS` | `180` / `730` | Maintenance label thresholds |
 | `ANKI_MCP_LOG_LEVEL` | `INFO` | Logs go to stderr |
 | `HF_TOKEN` | | Optional HuggingFace token for higher download rate limits (a Space secret) |
-
-## Architecture
-
-Ports and adapters, so the storage can be replaced without touching the MCP layer:
-
-```
-interface/mcp   MCPServer tools, resources, prompts   (knows MCP, not storage)
-application     catalog, compatibility, maintenance, history, similarity, stats services
-domain          pydantic models, AddonQuery, AddonRepository port, optional SqlQueryable/Refreshable
-adapters        hf_parquet (DuckDB over the published Parquet files), memory (tests)
-bootstrap       settings -> repository -> services -> server -> transport
-```
-
-A new storage backend implements `AddonRepository` and passes `tests/contract`, which runs the same suite
-against every adapter and checks that the adapters return identical records.
-
-## Development
-
-```bash
-uv sync
-uv run pytest
-uv run ruff check src tests
-uv run mypy
-```
