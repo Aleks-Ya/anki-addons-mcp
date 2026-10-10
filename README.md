@@ -52,6 +52,40 @@ docker build -t anki-addons-mcp .
 docker run -p 7860:7860 anki-addons-mcp
 ```
 
+## Debug with the MCP Inspector
+
+The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) needs Node.js (`npx`).
+
+**STDIO.** The Inspector launches the server itself:
+
+```bash
+npx @modelcontextprotocol/inspector uv run anki-addons-mcp
+npx @modelcontextprotocol/inspector uv --directory /path/to/anki-addons-mcp run anki-addons-mcp
+```
+
+Use the first command from the project directory and the second from anywhere else. The UI opens at
+`http://localhost:6274` with the transport set to STDIO. Click **Connect**, then use the **Tools**,
+**Resources** and **Prompts** tabs. Server logs (stderr) appear in the Inspector's server output pane.
+
+**Streamable HTTP.** Start the server, then connect the Inspector to it:
+
+```bash
+uv run anki-addons-mcp --transport http --port 8000
+npx @modelcontextprotocol/inspector
+```
+
+In the UI, set **Transport Type** to *Streamable HTTP* and **URL** to `http://localhost:8000/mcp`, then
+click **Connect**. For the Docker image, use `http://localhost:7860/mcp`.
+
+**Tips**
+- **Timeouts:** the first start downloads the latest snapshot (~15 MB). The first `get_addon_history` or
+  `diff_snapshots` call that needs older snapshots can take a minute or more. If a call times out, raise
+  **Request Timeout** in the Inspector's **Configuration** panel (e.g. `300000` ms). Later runs read the
+  files from the HF cache.
+- **Offline or faster startup:** serve a local copy of the dataset (`latest/` and `history/<date>/`):
+  `npx @modelcontextprotocol/inspector uv run anki-addons-mcp --backend local_parquet --data-dir /path/to/dataset`
+- **Less noise:** add `--refresh-interval 0` to turn off the hourly check for a new dataset revision.
+
 ## Capabilities
 
 **Tools** (all read-only, every data tool takes an optional `snapshot`, `YYYY-MM-DD` or `latest`):
@@ -111,5 +145,4 @@ uv sync
 uv run pytest
 uv run ruff check src tests
 uv run mypy
-npx @modelcontextprotocol/inspector uv run anki-addons-mcp
 ```
