@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "anki-addons-mcp"
+version = "0.1.0"
+description = "MCP server providing access to the Anki Addons dataset (HuggingFace Ya-Alex/anki-addons)."
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+authors = [{ name = "Aleksey Yablokov", email = "alex_ya@mailbox.org" }]
+keywords = ["anki", "addons", "mcp", "dataset", "huggingface"]
+dependencies = [
+    "mcp",
+    "pydantic>=2",
+    "pydantic-settings",
+    "duckdb",
+    "huggingface-hub",
+    "uvicorn",
+]
+
+[project.urls]
+Dataset = "https://huggingface.co/datasets/Ya-Alex/anki-addons"
+
+[project.scripts]
+anki-addons-mcp = "anki_addons_mcp.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/anki_addons_mcp"]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "anyio",
+    "ruff",
+    "mypy",
+    "pyarrow",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.mypy]
+python_version = "3.13"
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["anki_addons_mcp.domain.*", "anki_addons_mcp.application.*"]
+strict = true
