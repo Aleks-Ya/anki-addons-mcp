@@ -51,11 +51,15 @@ downloaded on demand by history tools, so the first history question can take a 
 
 ## Use it remotely (Streamable HTTP)
 
-Connect to a hosted instance (e.g. a HuggingFace Space) by URL:
+Connect to the hosted instance on the [HuggingFace Space](https://huggingface.co/spaces/Ya-Alex/anki-addons-mcp)
+by URL:
 
 ```bash
-claude mcp add --transport http anki-addons https://<user>-anki-addons-mcp.hf.space/mcp
+claude mcp add --transport http anki-addons https://ya-alex-anki-addons-mcp.hf.space/mcp
 ```
+
+The Space sleeps after inactivity, so the first request can take a while. To explore the server in a browser,
+see [Debug with the MCP Inspector](README-DEV.md#debug-with-the-mcp-inspector).
 
 To host your own instance, see [Run over HTTP](README-DEV.md#run-over-http) and
 [Deploy to a HuggingFace Space](README-DEV.md#deploy-to-a-huggingface-space).

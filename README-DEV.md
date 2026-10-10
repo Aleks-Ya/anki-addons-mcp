@@ -77,6 +77,18 @@ npx @modelcontextprotocol/inspector
 In the UI, set **Transport Type** to *Streamable HTTP* and **URL** to `http://localhost:8000/mcp`, then
 click **Connect**. For the Docker image, use `http://localhost:7860/mcp`.
 
+**Deployed Space.** Connect the Inspector the same way, with **URL** set to
+`https://ya-alex-anki-addons-mcp.hf.space/mcp`. The CLI mode runs a single request and prints the JSON:
+
+```bash
+npx @modelcontextprotocol/inspector --cli https://ya-alex-anki-addons-mcp.hf.space/mcp --transport http --method tools/list
+npx @modelcontextprotocol/inspector --cli https://ya-alex-anki-addons-mcp.hf.space/mcp --transport http \
+  --method tools/call --tool-name search_addons --tool-arg query="image occlusion" --tool-arg limit=3
+```
+
+The Space sleeps after inactivity, so the first request can be slow while it wakes up. Server logs are in the
+**Logs** tab of the [Space page](https://huggingface.co/spaces/Ya-Alex/anki-addons-mcp), not in the Inspector.
+
 **Tips**
 - **Timeouts:** the first start downloads the latest snapshot (~15 MB). The first `get_addon_history` or
   `diff_snapshots` call that needs older snapshots can take a minute or more. If a call times out, raise
@@ -114,12 +126,18 @@ against every adapter and checks that the adapters return identical records.
 
 ## Deploy to a HuggingFace Space
 
+Space: https://huggingface.co/spaces/Ya-Alex/anki-addons-mcp
+
 1. Create a Space with the **Docker** SDK.
 2. Push this repository to it. The YAML header of `README.md` configures the Space (`sdk: docker`,
-   `app_port: 7860`).
+   `app_port: 7860`):
+   ```bash
+   git remote add space https://huggingface.co/spaces/Ya-Alex/anki-addons-mcp
+   git push space main
+   ```
 3. Optionally add an `HF_TOKEN` secret for higher download rate limits.
 
-The endpoint is `https://<user>-anki-addons-mcp.hf.space/mcp`. The Space loads the latest snapshot at
+The endpoint is `https://ya-alex-anki-addons-mcp.hf.space/mcp`. The Space loads the latest snapshot at
 startup; its disk is ephemeral, so snapshots are downloaded again after a restart.
 
 ## Release a new version
