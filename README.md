@@ -26,8 +26,9 @@ and "what changed since last month?".
 
 ## Use it locally (STDIO)
 
-Requires [uv](https://docs.astral.sh/uv/). `uvx anki-addons-mcp` works once the package is published to
-PyPI; until then, run it from a checkout as described in [Run from sources](README-DEV.md#run-from-sources).
+Requires [uv](https://docs.astral.sh/uv/). `uvx` runs the [PyPI package](https://pypi.org/project/anki-addons-mcp/)
+in an isolated, cached environment; to run a working copy instead, see
+[Run from sources](README-DEV.md#run-from-sources).
 
 Register the server in Claude Code:
 

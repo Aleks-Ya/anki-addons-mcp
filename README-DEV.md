@@ -131,5 +131,23 @@ versions carry the `.dev0` suffix; each bump makes a commit and needs a clean wo
 1. Show the next versions: `uv run bump-my-version show-bump`
 2. Switch the dev version to a release and tag it (`0.1.0.dev0` -> `0.1.0`, tag `v0.1.0`):
    `uv run bump-my-version bump release --tag`
-3. Switch the release to the next dev version (`0.1.0` -> `0.2.0.dev0`): `uv run bump-my-version bump minor`
-4. Push the branch and tags: `git push origin HEAD --tags`
+3. Publish the tagged commit as described in [Publish to PyPI](#publish-to-pypi)
+4. Switch the release to the next dev version (`0.1.0` -> `0.2.0.dev0`): `uv run bump-my-version bump minor`
+5. Push the branch and tags: `git push origin HEAD --tags`
+6. Verify the release: `uvx --refresh anki-addons-mcp@0.1.0 --version`
+
+## Publish to PyPI
+PyPI package: https://pypi.org/project/anki-addons-mcp
+
+Publishing is manual, with a PyPI API token. The PyPI description is generated from `README.md` by
+[hatch-fancy-pypi-readme](https://github.com/hynek/hatch-fancy-pypi-readme): it skips the HuggingFace
+Space header and turns relative links into GitHub links.
+
+```bash
+rm -rf dist && uv build                 # creates dist/*.whl and dist/*.tar.gz
+uvx twine check --strict dist/*
+uv publish                              # requires a PyPI API token (UV_PUBLISH_TOKEN)
+```
+
+A version can be uploaded to PyPI only once. To try an upload first, publish to TestPyPI (a separate
+account and token): `uv publish --publish-url https://test.pypi.org/legacy/`.

@@ -1,16 +1,25 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-fancy-pypi-readme"]
 build-backend = "hatchling.build"
 
 [project]
 name = "anki-addons-mcp"
-dynamic = ["version"]
+dynamic = ["version", "readme"]
 description = "MCP server providing access to the Anki Addons dataset (HuggingFace Ya-Alex/anki-addons)."
-readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Aleksey Yablokov", email = "alex_ya@mailbox.org" }]
 keywords = ["anki", "addons", "mcp", "dataset", "huggingface"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Education",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "mcp",
     "pydantic>=2",
@@ -21,6 +30,9 @@ dependencies = [
 ]
 
 [project.urls]
+Homepage = "https://github.com/Aleks-Ya/anki-addons-mcp"
+Repository = "https://github.com/Aleks-Ya/anki-addons-mcp"
+Issues = "https://github.com/Aleks-Ya/anki-addons-mcp/issues"
 Dataset = "https://huggingface.co/datasets/Ya-Alex/anki-addons"
 
 [project.scripts]
@@ -28,6 +40,20 @@ anki-addons-mcp = "anki_addons_mcp.__main__:main"
 
 [tool.hatch.version]
 path = "src/anki_addons_mcp/__init__.py"
+
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+start-at = "# Anki Addons MCP"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '\]\((?!https?://)([^)]+)\)'
+replacement = '](https://github.com/Aleks-Ya/anki-addons-mcp/blob/main/\1)'
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/anki_addons_mcp"]
