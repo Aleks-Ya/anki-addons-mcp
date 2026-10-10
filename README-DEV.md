@@ -121,3 +121,15 @@ against every adapter and checks that the adapters return identical records.
 
 The endpoint is `https://<user>-anki-addons-mcp.hf.space/mcp`. The Space loads the latest snapshot at
 startup; its disk is ephemeral, so snapshots are downloaded again after a restart.
+
+## Release a new version
+
+The version lives in `src/anki_addons_mcp/__init__.py` (`__version__`) and is bumped with
+[bump-my-version](https://github.com/callowayproject/bump-my-version) (`.bumpversion.toml`). Development
+versions carry the `.dev0` suffix; each bump makes a commit and needs a clean working tree.
+
+1. Show the next versions: `uv run bump-my-version show-bump`
+2. Switch the dev version to a release and tag it (`0.1.0.dev0` -> `0.1.0`, tag `v0.1.0`):
+   `uv run bump-my-version bump release --tag`
+3. Switch the release to the next dev version (`0.1.0` -> `0.2.0.dev0`): `uv run bump-my-version bump minor`
+4. Push the branch and tags: `git push origin HEAD --tags`
