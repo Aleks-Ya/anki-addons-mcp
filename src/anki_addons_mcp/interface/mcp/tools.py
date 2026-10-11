@@ -65,10 +65,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
     def filter_addons(  # NOSONAR - each filter is a flat tool parameter in the MCP input schema
         min_rating: int | None = None, min_likes: int | None = None, min_stars: int | None = None,
         has_github: bool | None = None, has_tests: bool | None = None, has_forum: bool | None = None,
-        license: Annotated[str | None, Field(description="SPDX id, e.g. MIT, GPL-3.0, AGPL-3.0")] = None,
         language: Annotated[str | None, Field(description="GitHub language, e.g. Python, JavaScript")] = None,
         description_language: Annotated[str | None, Field(description="ISO code of the description")] = None,
-        topic: Annotated[str | None, Field(description="GitHub topic")] = None,
         compatible_with_anki: AnkiVersion = None,
         anki_version_kind: Annotated[VersionKind | None, Field(
             description="Meaning of the addon's newest supported Anki version: hard (Anki disables it on newer "
@@ -88,8 +86,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         with tool_errors():
             filters = AddonFilters(
                 min_rating=min_rating, min_likes=min_likes, min_stars=min_stars, has_github=has_github,
-                has_tests=has_tests, has_forum=has_forum, license=license, language=language,
-                description_language=description_language, topic=topic, compatible_with_anki=compatible_with_anki,
+                has_tests=has_tests, has_forum=has_forum, language=language,
+                description_language=description_language, compatible_with_anki=compatible_with_anki,
                 anki_version_kind=anki_version_kind, anki_version_at_least=anki_version_at_least,
                 updated_after=updated_after, updated_before=updated_before, archived=archived,
                 has_ai_declaration=has_ai_declaration, has_ai_tooling=has_ai_tooling, tags=tags,

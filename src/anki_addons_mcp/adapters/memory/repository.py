@@ -60,16 +60,12 @@ def _github_checks(gh: GithubInfo | None, f: AddonFilters) -> list[bool]:
         checks.append((gh is not None) == f.has_github)
     if f.has_tests is not None:
         checks.append(bool(gh and gh.tests_count) == f.has_tests)
-    if f.license is not None:
-        checks.append(gh is not None and _lower(gh.license) == f.license.lower())
     if f.language is not None:
         language = f.language.lower()
         checks.append(gh is not None and (language in [x.lower() for x in gh.languages]
                                           or _lower(gh.primary_language) == language))
     if f.github_user is not None:
         checks.append(gh is not None and _lower(gh.user) == f.github_user.lower())
-    if f.topic is not None:
-        checks.append(gh is not None and f.topic.lower() in [x.lower() for x in gh.topics])
     if f.archived is not None:
         checks.append(bool(gh and gh.archived) == f.archived)
     if f.has_ai_tooling is not None:

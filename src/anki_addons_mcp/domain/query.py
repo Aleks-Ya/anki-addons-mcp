@@ -25,11 +25,9 @@ class AddonFilters(BaseModel):
     has_github: bool | None = None
     has_tests: bool | None = None
     has_forum: bool | None = None
-    license: str | None = None
     language: str | None = None
     description_language: str | None = None
     github_user: str | None = None
-    topic: str | None = None
     updated_after: date | None = None
     updated_before: date | None = None
     archived: bool | None = None

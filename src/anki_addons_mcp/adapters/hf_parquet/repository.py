@@ -114,15 +114,11 @@ def _github_filters(f: AddonFilters, add: _Add) -> None:
         add("has_github = ?", f.has_github)
     if f.has_tests is not None:
         add("(coalesce(github_tests_count, 0) > 0) = ?", f.has_tests)
-    if f.license is not None:
-        add("lower(github_license) = lower(?)", f.license)
     if f.language is not None:
         add("(list_contains(list_transform(github_languages, lambda x: lower(x)), lower(?))"
             " OR lower(github_primary_language) = lower(?))", f.language, f.language)
     if f.github_user is not None:
         add("lower(github_user) = lower(?)", f.github_user)
-    if f.topic is not None:
-        add("list_contains(list_transform(github_topics, lambda x: lower(x)), lower(?))", f.topic)
     if f.archived is not None:
         add("coalesce(github_archived, false) = ?", f.archived)
     if f.has_ai_tooling is not None:
