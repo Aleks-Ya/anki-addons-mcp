@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
@@ -54,6 +54,11 @@ HasAiTooling = Annotated[bool | None, Field(
     description="Repository has AI coding tool traces (e.g. AGENTS.md, .cursor)")]
 
 
+def _filters(arguments: dict[str, Any]) -> AddonFilters:
+    """Filters from a tool's arguments: every parameter named like an AddonFilters field."""
+    return AddonFilters(**{name: value for name, value in arguments.items() if name in AddonFilters.model_fields})
+
+
 def register_tools(mcp: MCPServer, services: Services) -> None:
     catalog = services.catalog
 
@@ -61,8 +66,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         "Full-text search over addon titles, AnkiWeb descriptions, AI summaries and tags, GitHub topics and "
         "repo descriptions. Returns compact addon cards ranked by relevance. Accepts every filter of "
         "filter_addons; filters are combined with the query with AND."))
-    def search_addons(  # NOSONAR - each filter is a flat tool parameter in the MCP input schema
-        query: Annotated[str, Field(description="Search words, e.g. 'image occlusion'")],
+    def search_addons(
+        query: Annotated[str, Field(description="Search words, e.g. 'image occlusion'")],  # NOSONAR - flat MCP tool parameters
         min_rating: int | None = None, min_likes: int | None = None, min_stars: int | None = None,
         has_github: bool | None = None, has_tests: bool | None = None, has_forum: bool | None = None,
         language: Language = None, description_language: DescriptionLanguage = None,
@@ -75,23 +80,15 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         limit: Limit = 20, offset: Offset = 0, snapshot: Snapshot = "latest",
     ) -> Page[AddonCard]:
         with tool_errors():
-            filters = AddonFilters(
-                min_rating=min_rating, min_likes=min_likes, min_stars=min_stars, has_github=has_github,
-                has_tests=has_tests, has_forum=has_forum, language=language,
-                description_language=description_language, compatible_with_anki=compatible_with_anki,
-                anki_version_kind=anki_version_kind, anki_version_at_least=anki_version_at_least,
-                updated_after=updated_after, updated_before=updated_before, archived=archived,
-                has_ai_declaration=has_ai_declaration, has_ai_tooling=has_ai_tooling, tags=tags,
-                exclude_tags=exclude_tags,
-            )
+            filters = _filters(locals())
             return catalog.search(query, limit, offset, filters, parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Structured addon query. All filters are optional and combined with AND. "
         "Returns addon cards and the total number of matches. sort_by=anki_version orders by the newest "
         "supported Anki version."))
-    def filter_addons(  # NOSONAR - each filter is a flat tool parameter in the MCP input schema
-        min_rating: int | None = None, min_likes: int | None = None, min_stars: int | None = None,
+    def filter_addons(
+        min_rating: int | None = None, min_likes: int | None = None, min_stars: int | None = None,  # NOSONAR - flat MCP tool parameters
         has_github: bool | None = None, has_tests: bool | None = None, has_forum: bool | None = None,
         language: Language = None, description_language: DescriptionLanguage = None,
         compatible_with_anki: AnkiVersion = None,
@@ -104,15 +101,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         limit: Limit = 20, offset: Offset = 0, snapshot: Snapshot = "latest",
     ) -> Page[AddonCard]:
         with tool_errors():
-            filters = AddonFilters(
-                min_rating=min_rating, min_likes=min_likes, min_stars=min_stars, has_github=has_github,
-                has_tests=has_tests, has_forum=has_forum, language=language,
-                description_language=description_language, compatible_with_anki=compatible_with_anki,
-                anki_version_kind=anki_version_kind, anki_version_at_least=anki_version_at_least,
-                updated_after=updated_after, updated_before=updated_before, archived=archived,
-                has_ai_declaration=has_ai_declaration, has_ai_tooling=has_ai_tooling, tags=tags,
-                exclude_tags=exclude_tags,
-            )
+            filters = _filters(locals())
             return catalog.filter(filters, sort_by, descending, limit, offset, parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description=(
