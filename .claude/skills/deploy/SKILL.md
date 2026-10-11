@@ -1,7 +1,7 @@
 ---
 name: deploy
 description: Deploy main to the HuggingFace Space and see it running — check that main is pushed and green, push it to the `space` remote, wait for the Space to rebuild on that commit, and smoke-test the live MCP endpoint. Use when the user says "deploy", "/deploy", or asks to update/redeploy the HuggingFace Space.
-allowed-tools: Bash(git *) Bash(gh *) Bash(curl *) Bash(python3 *) Bash(npx *) Bash(hf auth whoami)
+allowed-tools: Bash(git *) Bash(gh *) Bash(curl *) Bash(python3 *) Bash(npx *)
 disable-model-invocation: true
 ---
 
@@ -59,19 +59,14 @@ curl -s https://huggingface.co/api/spaces/Ya-Alex/anki-addons-mcp/runtime \
 
 ## 3. Push to the Space
 
-The `space` remote uses HTTPS and needs HuggingFace credentials. Use the user's current `hf` CLI login; don't
-ask the user to push or to set up credentials. Pass the token to git through a credential helper given only for
-this command, so nothing is written to the git config and the token never appears in the output:
-
 ```bash
-hf auth whoami
-git -c 'credential.https://huggingface.co.helper=!f() { test "$1" = get && echo username=Ya-Alex && echo "password=$(hf auth token)"; }; f' \
-  push space main
+git push space main
 ```
 
-- If `hf auth whoami` shows no login, stop and ask the user to run `! hf auth login`.
-- Never print the token, and never save it in the git config or `~/.git-credentials`.
-- If the push is rejected for any other reason, stop and report.
+Git authenticates to huggingface.co with the HF token stored in its credential helper. If the push fails with
+an authentication error (e.g. `could not read Username for 'https://huggingface.co'`), stop and point the user
+to the one-time setup in README-DEV.md → "Deploy to a HuggingFace Space". If the push is rejected for any other
+reason, stop and report.
 
 ## 4. Wait for the Space to build and start
 

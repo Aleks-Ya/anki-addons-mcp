@@ -136,18 +136,23 @@ against every adapter and checks that the adapters return identical records.
 Space: https://huggingface.co/spaces/Ya-Alex/anki-addons-mcp
 
 1. Create a Space with the **Docker** SDK.
-2. Push this repository to it. The YAML header of `README.md` configures the Space (`sdk: docker`,
+2. Let git use your HuggingFace login (once per machine; requires `hf auth login`):
+   ```bash
+   git config --global credential.helper store
+   hf auth login --token "$(hf auth token)" --add-to-git-credential
+   ```
+3. Push this repository to it. The YAML header of `README.md` configures the Space (`sdk: docker`,
    `app_port: 7860`):
    ```bash
    git remote add space https://huggingface.co/spaces/Ya-Alex/anki-addons-mcp
    git push space main
    ```
-3. Optionally add an `HF_TOKEN` secret for higher download rate limits.
+4. Optionally add an `HF_TOKEN` secret for higher download rate limits.
 
 The endpoint is `https://ya-alex-anki-addons-mcp.hf.space/mcp`. The Space loads the latest snapshot at
 startup; its disk is ephemeral, so snapshots are downloaded again after a restart.
 
-Step 2 for an existing Space is automated by the skill `/deploy`: it pushes `main` after a green CI run, waits
+Step 3 for an existing Space is automated by the skill `/deploy`: it pushes `main` after a green CI run, waits
 for the rebuild and smoke-tests the endpoint.
 
 ## Release a new version
