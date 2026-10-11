@@ -1,7 +1,7 @@
 ---
 name: deploy
 description: Deploy main to the HuggingFace Space and see it running — check that main is pushed and green, push it to the `space` remote, wait for the Space to rebuild on that commit, and smoke-test the live MCP endpoint. Use when the user says "deploy", "/deploy", or asks to update/redeploy the HuggingFace Space.
-allowed-tools: Bash(git *) Bash(gh *) Bash(curl *) Bash(python3 *) Bash(npx *)
+allowed-tools: Bash(git *) Bash(gh *) Bash(curl *) Bash(python3 *) Bash(npx *) Bash(hf auth whoami)
 disable-model-invocation: true
 ---
 
@@ -59,28 +59,38 @@ curl -s https://huggingface.co/api/spaces/Ya-Alex/anki-addons-mcp/runtime \
 
 ## 3. Push to the Space
 
+The `space` remote uses HTTPS and needs HuggingFace credentials. Use the user's current `hf` CLI login; don't
+ask the user to push or to set up credentials. Pass the token to git through a credential helper given only for
+this command, so nothing is written to the git config and the token never appears in the output:
+
 ```bash
-git push space main
+hf auth whoami
+git -c 'credential.https://huggingface.co.helper=!f() { test "$1" = get && echo username=Ya-Alex && echo "password=$(hf auth token)"; }; f' \
+  push space main
 ```
 
-The `space` remote uses HTTPS and needs HuggingFace credentials (a write token). If the push fails with an
-authentication error (e.g. `could not read Username for 'https://huggingface.co'`), do not try to work around
-it or ask for the token. Ask the user to run the push in this session themselves:
-
-```
-! git push space main
-```
-
-Then continue with step 4 once they have run it. If the push is rejected for any other reason, stop and report.
+- If `hf auth whoami` shows no login, stop and ask the user to run `! hf auth login`.
+- Never print the token, and never save it in the git config or `~/.git-credentials`.
+- If the push is rejected for any other reason, stop and report.
 
 ## 4. Wait for the Space to build and start
 
-Pushing triggers a Docker rebuild. Poll the runtime API (every ~20 s, up to ~15 min) until the Space runs the
-pushed commit:
+Pushing triggers a Docker rebuild. Poll the runtime API every 20 s, for up to 15 min, until the Space runs the
+pushed commit. Run the poll as a single `python3` command (no shell `for`/`sleep` loop, which needs extra
+permission), with a Bash timeout of at least 960000 ms:
 
 ```bash
-curl -s https://huggingface.co/api/spaces/Ya-Alex/anki-addons-mcp/runtime \
-  | python3 -c 'import sys,json; r=json.load(sys.stdin); print(r["stage"], r.get("sha"))'
+python3 -c '
+import json, sys, time, urllib.request
+url = "https://huggingface.co/api/spaces/Ya-Alex/anki-addons-mcp/runtime"
+for _ in range(45):
+    runtime = json.load(urllib.request.urlopen(url))
+    stage, sha = runtime["stage"], runtime.get("sha")
+    print(time.strftime("%H:%M:%S"), stage, sha, flush=True)
+    if (stage == "RUNNING" and sha == sys.argv[1]) or stage.endswith("ERROR"):
+        break
+    time.sleep(20)
+' "$(git rev-parse HEAD)"
 ```
 
 - `BUILDING`, `RUNNING_BUILDING`, `APP_STARTING` (or the old sha still `RUNNING`): keep waiting.
