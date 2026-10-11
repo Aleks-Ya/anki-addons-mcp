@@ -3,6 +3,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from anki_addons_mcp.domain.models import VersionKind
+
 
 class SortField(StrEnum):
     RELEVANCE = "relevance"
@@ -12,6 +14,7 @@ class SortField(StrEnum):
     UPDATE_DATE = "update_date"
     LAST_COMMIT = "last_commit"
     FORUM_POSTS = "forum_posts"
+    ANKI_VERSION = "anki_version"
 
 
 class AddonFilters(BaseModel):
@@ -33,6 +36,8 @@ class AddonFilters(BaseModel):
     has_ai_declaration: bool | None = None
     has_ai_tooling: bool | None = None
     compatible_with_anki: str | None = None
+    anki_version_kind: VersionKind | None = None
+    anki_version_at_least: str | None = None
     tags: list[str] | None = None
     exclude_tags: list[str] | None = None
 

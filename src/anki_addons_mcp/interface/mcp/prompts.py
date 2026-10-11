@@ -6,16 +6,21 @@ AI_NOTE = ("AI summaries and tags (ai_summary, ai_tags) are LLM-generated and ca
            "on them and prefer the AnkiWeb description or README for important claims.")
 SKIP_TAGS = "exclude_tags=['obsolete', 'no-description']"
 WARN_TAGS = "Flag addons tagged paid, beta, fork-or-reupload or service-client."
+VERDICTS = ("Verdicts: 'unsupported' above a hard limit means Anki disables the addon; 'likely' means it was "
+            "tested on an older Anki and still runs, untested; 'unknown' means the author gave no upper version.")
 
 
 def register_prompts(mcp: MCPServer, services: Services) -> None:
     @mcp.prompt(description="Recommend addons for a task, checking compatibility and maintenance")
     def find_addon_for_task(task: str, anki_version: str = "") -> str:
         version = f" The user runs Anki {anki_version}." if anki_version else ""
-        compat = (f"3. Call check_compatibility with the candidate ids and anki_version={anki_version}.\n"
-                  if anki_version else "3. Note each candidate's supported Anki versions (anki_version field).\n")
+        compat = (f"3. Call check_compatibility with the candidate ids and anki_version={anki_version}. {VERDICTS}\n"
+                  if anki_version else "3. Note each candidate's newest supported Anki version (anki_version and "
+                                       "anki_version_kind fields).\n")
+        narrow = (f" Pass compatible_with_anki={anki_version} to search_addons and filter_addons when the "
+                  "unfiltered results are crowded with incompatible addons." if anki_version else "")
         return (
-            f"Find Anki addons for this task: {task}.{version}\n\n"
+            f"Find Anki addons for this task: {task}.{version}{narrow}\n\n"
             "1. Call search_addons with a few different phrasings of the task (limit 10 each). Also call "
             "list_tags, pick the function tags that match the task and call filter_addons with them "
             f"(tags=[...], {SKIP_TAGS}).\n"
@@ -45,7 +50,9 @@ def register_prompts(mcp: MCPServer, services: Services) -> None:
             f"Write a health report for Anki addon {addon_id}.\n\n"
             "1. get_addon for the basics.\n2. assess_maintenance for activity signals.\n"
             "3. get_addon_history to show the trend of rating, likes and stars.\n"
-            "4. check_compatibility against the newest Anki version mentioned in any branch.\n"
+            "4. Find the newest Anki release known to the dataset with filter_addons(sort_by='anki_version', "
+            "limit=1) (its anki_version), then call check_compatibility against it and report the addon's "
+            f"anki_version_kind. {VERDICTS}\n"
             "Conclude with a verdict (safe to rely on / use with care / avoid) and the reasons.\n\n" + AI_NOTE
         )
 
@@ -56,7 +63,7 @@ def register_prompts(mcp: MCPServer, services: Services) -> None:
             f"{addon_ids} (comma-separated AnkiWeb ids).\n\n"
             f"1. Call check_compatibility with all ids and anki_version={target_anki_version}.\n"
             "2. Group the result into: ready (supported), probably fine (likely), blocked (unsupported), "
-            "unknown.\n"
+            f"unknown. {VERDICTS} Mention when the manifest_verdict disagrees with the AnkiWeb verdict.\n"
             "3. For blocked and unknown addons, call assess_maintenance, then find alternatives with "
             f"find_similar_addons or search_addons using compatible_with_anki={target_anki_version}.\n"
             "4. Give a short upgrade recommendation.\n\n" + AI_NOTE
@@ -122,5 +129,24 @@ def register_prompts(mcp: MCPServer, services: Services) -> None:
             "or paid).\n"
             "4. Report: crowded categories and their leaders, small or under-served categories that could "
             "use new addons, and categories where the leaders look stale (check with assess_maintenance).\n"
+            "Link every addon to its AnkiWeb page.\n\n" + AI_NOTE
+        )
+
+    @mcp.prompt(description="How ready the addon ecosystem is for an Anki release")
+    def anki_release_readiness(anki_version: str) -> str:
+        return (
+            f"Assess how ready the Anki addon ecosystem is for Anki {anki_version}.\n\n"
+            "1. Read anki-addons://dataset/anki-versions if you need the meaning of point versions and kinds.\n"
+            "2. Call get_statistics with group_by=['anki_version_kind', 'anki_version'] (top_values 30) for the "
+            "overall picture.\n"
+            f"3. Call filter_addons with compatible_with_anki={anki_version} (limit 1) for the number of ready "
+            f"addons, and with anki_version_at_least={anki_version} for the ones explicitly supporting it.\n"
+            "4. Call filter_addons with anki_version_kind='hard', sorted by likes (limit 30), and use "
+            f"check_compatibility with anki_version={anki_version} on them to find popular addons that Anki "
+            "will disable.\n"
+            "5. For the 5 most popular blocked addons, call assess_maintenance and find alternatives with "
+            f"find_similar_addons or search_addons using compatible_with_anki={anki_version}.\n"
+            "6. Report: headline numbers (ready, untested but likely working, blocked, unknown), notable blocked "
+            f"addons with alternatives, and advice for users planning the upgrade. {VERDICTS}\n"
             "Link every addon to its AnkiWeb page.\n\n" + AI_NOTE
         )

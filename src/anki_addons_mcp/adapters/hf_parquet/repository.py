@@ -21,7 +21,7 @@ from anki_addons_mcp.adapters.hf_parquet.sql import (
     tags_select,
     validate_readonly_select,
 )
-from anki_addons_mcp.domain.compatibility import is_compatible
+from anki_addons_mcp.domain.compatibility import require_point
 from anki_addons_mcp.domain.errors import DataSourceUnavailable, InvalidQuery, SnapshotNotFound
 from anki_addons_mcp.domain.models import (
     NONE_GROUP,
@@ -29,7 +29,6 @@ from anki_addons_mcp.domain.models import (
     AddonDetails,
     AddonHistoryPoint,
     Aggregation,
-    Branch,
     GroupField,
     Page,
     SnapshotInfo,
@@ -54,6 +53,7 @@ _SORT_EXPR = {
     SortField.UPDATE_DATE: "NULLIF(update_date, '')",
     SortField.LAST_COMMIT: "github_last_commit",
     SortField.FORUM_POSTS: "forum_posts_count",
+    SortField.ANKI_VERSION: "anki_point_version",
 }
 
 _SCALAR_GROUPS = {
@@ -61,6 +61,7 @@ _SCALAR_GROUPS = {
     GroupField.PRIMARY_LANGUAGE: "github_primary_language",
     GroupField.DESCRIPTION_LANGUAGE: "description_language",
     GroupField.ANKI_VERSION: "anki_version",
+    GroupField.ANKI_VERSION_KIND: "anki_version_kind",
     GroupField.UPDATE_YEAR: "left(update_date, 4)",
 }
 
@@ -72,6 +73,12 @@ _LIST_GROUPS = {
 }
 
 _LOWER_TAGS = "list_transform(ai_tags, lambda x: lower(x))"
+
+# A branch supports (or likely supports) point version $p; mirrors domain.compatibility.branch_support.
+_COMPATIBLE_BRANCH = ("len(list_filter(branches, lambda b: b.min_point_version <= $p AND ("
+                      "b.max_version_kind IN ('open', 'tested') "
+                      "OR (b.max_version_kind = 'hard' AND $p <= b.max_point_version) "
+                      "OR (b.max_version_kind = 'unknown' AND b.min_point_version = $p)))) > 0")
 
 
 def _lower_all(values: list[str]) -> list[str]:
@@ -121,6 +128,12 @@ def _filters_sql(f: AddonFilters) -> tuple[list[str], list[Any]]:
         add("(coalesce(len(ai_declaration_markers), 0) > 0) = ?", f.has_ai_declaration)
     if f.has_ai_tooling is not None:
         add("(coalesce(len(github_ai_tooling_markers), 0) > 0) = ?", f.has_ai_tooling)
+    if f.compatible_with_anki is not None:
+        add(_COMPATIBLE_BRANCH.replace("$p", str(require_point(f.compatible_with_anki))))
+    if f.anki_version_kind is not None:
+        add("anki_version_kind = ?", f.anki_version_kind.value)
+    if f.anki_version_at_least is not None:
+        add("anki_point_version >= ?", require_point(f.anki_version_at_least))
     if f.tags:
         add(f"list_has_all({_LOWER_TAGS}, ?)", _lower_all(f.tags))
     if f.exclude_tags:
@@ -284,25 +297,16 @@ class DuckDbAddonRepository(AddonRepository):
                 score_expr = "NULLIF(" + " + ".join(f"CAST(contains({haystack}, ?) AS DOUBLE)" for _ in terms) + ", 0)"
                 score_params = terms
             clauses.append("score IS NOT NULL")
-        extra = ", branches" if query.filters.compatible_with_anki else ""
         where = " AND ".join(clauses) or "true"
         order = (f"{_SORT_EXPR[query.effective_sort()]} {'DESC' if query.descending else 'ASC'} NULLS LAST, id")
         base = (f"WITH base AS (SELECT *, {score_expr} AS score FROM {{rel}}) "
-                f"SELECT {', '.join(CARD_COLUMNS)}{extra}, score FROM base WHERE {where} ORDER BY {order}")
+                f"SELECT {', '.join(CARD_COLUMNS)}, score FROM base WHERE {where} ORDER BY {order}")
         all_params = score_params + params
-        if query.filters.compatible_with_anki:
-            version = query.filters.compatible_with_anki
-            rows = [r for r in self._select(base, all_params, snapshot)
-                    if is_compatible([Branch.model_validate(b) for b in r["branches"] or []], version)]
-            total = len(rows)
-            end = None if query.limit is None else query.offset + query.limit
-            rows = rows[query.offset:end]
-        else:
-            total_rows = self._select(f"SELECT count(*) AS n FROM ({base})", all_params, snapshot)
-            total = int(total_rows[0]["n"])
-            paging = f" LIMIT {int(query.limit)}" if query.limit is not None else ""
-            paging += f" OFFSET {int(query.offset)}" if query.offset else ""
-            rows = self._select(base + paging, all_params, snapshot)
+        total_rows = self._select(f"SELECT count(*) AS n FROM ({base})", all_params, snapshot)
+        total = int(total_rows[0]["n"])
+        paging = f" LIMIT {int(query.limit)}" if query.limit is not None else ""
+        paging += f" OFFSET {int(query.offset)}" if query.offset else ""
+        rows = self._select(base + paging, all_params, snapshot)
         items = [row_to_card(r, r["score"]) for r in rows]
         return Page[AddonCard](items=items, total=total, offset=query.offset, limit=query.limit)
 
@@ -318,8 +322,8 @@ class DuckDbAddonRepository(AddonRepository):
             list(pool.map(state.relation, dates))
         points = []
         for d in dates:
-            rows = self._select("SELECT title, rating, likes, dislikes, github_stars, update_date, anki_version "
-                                "FROM {rel} WHERE id = ?", [addon_id], d)
+            rows = self._select("SELECT title, rating, likes, dislikes, github_stars, update_date, anki_version, "
+                                "anki_version_kind FROM {rel} WHERE id = ?", [addon_id], d)
             if not rows:
                 points.append(AddonHistoryPoint(snapshot=d, present=False))
                 continue
@@ -327,7 +331,7 @@ class DuckDbAddonRepository(AddonRepository):
             points.append(AddonHistoryPoint(
                 snapshot=d, present=True, title=row["title"], rating=row["rating"], likes=row["likes"],
                 dislikes=row["dislikes"], github_stars=row["github_stars"], update_date=row["update_date"] or None,
-                anki_version=row["anki_version"] or None,
+                anki_version=row["anki_version"] or None, anki_version_kind=row["anki_version_kind"],
             ))
         return points
 

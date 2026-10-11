@@ -12,10 +12,12 @@ from anki_addons_mcp.domain.models import (
     GithubLink,
     LanguageBytes,
     Manifest,
+    VersionKind,
 )
 
 CARD_COLUMNS = [
-    "id", "title", "url", "rating", "likes", "dislikes", "update_date", "anki_version", "ai_summary",
+    "id", "title", "url", "rating", "likes", "dislikes", "update_date", "anki_version", "anki_point_version",
+    "anki_version_kind", "ai_summary",
     "github_user", "github_repo", "github_stars", "github_last_commit", "github_archived", "github_license",
     "forum_posts_count", "ai_tags",
 ]
@@ -43,7 +45,8 @@ def row_to_card(row: dict[str, Any], score: float | None = None) -> AddonCard:
     return AddonCard(
         id=row["id"], title=row["title"] or "", url=row["url"] or "", rating=row["rating"] or 0,
         likes=row["likes"] or 0, dislikes=row["dislikes"] or 0, update_date=row["update_date"] or None,
-        anki_version=row["anki_version"] or None, ai_summary=row["ai_summary"],
+        anki_version=row["anki_version"] or None, anki_point_version=row["anki_point_version"],
+        anki_version_kind=row["anki_version_kind"] or VersionKind.UNKNOWN, ai_summary=row["ai_summary"],
         github_user=row["github_user"], github_repo=row["github_repo"], github_stars=row["github_stars"],
         github_last_commit=row["github_last_commit"], github_archived=row["github_archived"],
         license=row["github_license"], forum_posts_count=row["forum_posts_count"], ai_tags=_list(row["ai_tags"]),
@@ -59,6 +62,8 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
         rating=row["rating"] or 0,
         update_date=row["update_date"] or None,
         anki_version=row["anki_version"] or None,
+        anki_point_version=row["anki_point_version"],
+        anki_version_kind=row["anki_version_kind"] or VersionKind.UNKNOWN,
         branches=[Branch.model_validate(b) for b in _structs(row["branches"])],
         links=_list(row["links"]),
         likes=row["likes"] or 0,

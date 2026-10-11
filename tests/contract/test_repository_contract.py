@@ -4,8 +4,8 @@ import pytest
 
 from anki_addons_mcp.adapters.hf_parquet.repository import DuckDbAddonRepository
 from anki_addons_mcp.adapters.memory.repository import InMemoryAddonRepository
-from anki_addons_mcp.domain.errors import SnapshotNotFound
-from anki_addons_mcp.domain.models import NONE_GROUP, GroupField, TextKind
+from anki_addons_mcp.domain.errors import InvalidQuery, SnapshotNotFound
+from anki_addons_mcp.domain.models import NONE_GROUP, GroupField, TextKind, VersionKind
 from anki_addons_mcp.domain.ports import AddonRepository
 from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, SortField
 from tests.fixtures.dataset import (
@@ -118,6 +118,11 @@ def test_find_text_no_match(repository: AddonRepository) -> None:
     (AddonFilters(has_ai_tooling=True), {VIBE}),
     (AddonFilters(compatible_with_anki="25.02"), {KANJI, OCCLUSION, NO_GITHUB, NEW_ADDON, SAME_AUTHOR}),
     (AddonFilters(compatible_with_anki="2.1.0"), {KANJI, LEGACY}),
+    (AddonFilters(compatible_with_anki="2.1.54"), {HEATMAP, NO_GITHUB}),
+    (AddonFilters(compatible_with_anki="26.05b1"), {KANJI, OCCLUSION, NO_GITHUB, VIBE, NEW_ADDON, SAME_AUTHOR}),
+    (AddonFilters(anki_version_kind=VersionKind.HARD), {HEATMAP}),
+    (AddonFilters(anki_version_kind=VersionKind.UNKNOWN), {NO_GITHUB}),
+    (AddonFilters(anki_version_at_least="25.02"), {KANJI, VIBE, NEW_ADDON}),
     (AddonFilters(addon_ids=[KANJI, LEGACY, 424242]), {KANJI, LEGACY}),
     (AddonFilters(has_github=True, min_rating=50, has_tests=False), {HEATMAP}),
 ])
@@ -137,6 +142,7 @@ def test_find_text_and_filter(repository: AddonRepository) -> None:
     (SortField.UPDATE_DATE, VIBE),
     (SortField.LAST_COMMIT, VIBE),
     (SortField.FORUM_POSTS, OCCLUSION),
+    (SortField.ANKI_VERSION, VIBE),
 ])
 def test_find_sort(repository: AddonRepository, sort: SortField, first: int) -> None:
     assert ids(repository, AddonQuery(sort=sort, limit=1)) == [first]
@@ -156,6 +162,25 @@ def test_card_fields(repository: AddonRepository) -> None:
     assert "ai_model" not in card.model_dump()
     no_github = repository.find(AddonQuery(filters=AddonFilters(addon_ids=[NO_GITHUB]))).items[0]
     assert no_github.anki_version is None and no_github.github_stars is None
+    assert no_github.anki_point_version is None and no_github.anki_version_kind == VersionKind.UNKNOWN
+    assert (card.anki_point_version, card.anki_version_kind) == (250200, VersionKind.TESTED)
+
+
+def test_parsed_versions_in_details(repository: AddonRepository) -> None:
+    details = repository.get_addon(OCCLUSION)
+    assert details is not None and details.github is not None and details.github.manifest is not None
+    branch = details.anki_web.branches[0]
+    assert (branch.min_point_version, branch.max_point_version, branch.max_version_kind) == (
+        66, 250900, VersionKind.TESTED)
+    manifest = details.github.manifest
+    assert (manifest.min_version, manifest.max_version, manifest.max_version_kind) == (
+        "2.1.66", "25.09", VersionKind.HARD)
+    assert manifest.max_point_version == -250900
+
+
+def test_invalid_anki_version_filter(repository: AddonRepository) -> None:
+    with pytest.raises(InvalidQuery):
+        repository.find(AddonQuery(filters=AddonFilters(compatible_with_anki="latest")))
 
 
 def test_history(repository: AddonRepository) -> None:
@@ -165,6 +190,7 @@ def test_history(repository: AddonRepository) -> None:
     assert [p.present for p in added] == [False, True]
     assert [p.snapshot for p in repository.get_history(KANJI, from_=LATEST)] == [LATEST]
     assert [p.present for p in repository.get_history(REMOVED)] == [True, False]
+    assert [p.anki_version_kind for p in repository.get_history(HEATMAP)] == [VersionKind.HARD] * 2
 
 
 def test_aggregation(repository: AddonRepository) -> None:
@@ -185,6 +211,7 @@ def test_group_counts(repository: AddonRepository) -> None:
         "claude-code": 1, "agents-md": 1, NONE_GROUP: 7}
     assert repository.group_counts(GroupField.UPDATE_YEAR)["2026"] == 5
     assert repository.group_counts(GroupField.ANKI_VERSION)[NONE_GROUP] == 1
+    assert repository.group_counts(GroupField.ANKI_VERSION_KIND) == {"tested": 6, "hard": 1, "unknown": 1}
 
 
 def test_documentation(repository: AddonRepository) -> None:

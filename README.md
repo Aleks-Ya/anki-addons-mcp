@@ -72,14 +72,19 @@ To host your own instance, see [Run over HTTP](README-DEV.md#run-over-http) and
 `get_addon_history`, `diff_snapshots`, `get_statistics`, `top_addons`, `list_snapshots`, `list_tags`, and
 `query_sql` (one sandboxed DuckDB `SELECT` over the `addons` and `tags` tables; only offered by SQL-capable
 backends). `search_addons` and `filter_addons` filter by AI tags with `tags` and `exclude_tags`.
+Compatibility follows Anki's parsed versions (point versions and the `hard`/`tested`/`open`/`unknown` kind of the
+upper version); `filter_addons` also filters by `anki_version_kind` and `anki_version_at_least` and sorts by
+`anki_version`.
 
-**Resources**: `anki-addons://dataset/readme`, `anki-addons://dataset/schema`, `anki-addons://snapshots`,
+**Resources**: `anki-addons://dataset/readme`, `anki-addons://dataset/schema`,
+`anki-addons://dataset/anki-versions`, `anki-addons://snapshots`,
 `anki-addons://snapshots/{snapshot}/metadata`, `anki-addons://snapshots/{snapshot}/aggregation`,
 `anki-addons://addons/{addon_id}` (and `/readme`, `/description`, `/history`),
 `anki-addons://authors/{github_user}`, `anki-addons://tags`, `anki-addons://tags/{tag}`.
 
 **Prompts**: `find_addon_for_task`, `compare_addons`, `addon_health_report`, `upgrade_readiness`,
-`monthly_ecosystem_digest`, `before_you_build`, `author_portfolio`, `best_in_category`, `category_landscape`.
+`monthly_ecosystem_digest`, `before_you_build`, `author_portfolio`, `best_in_category`, `category_landscape`,
+`anki_release_readiness`.
 
 AI summaries and tags in the dataset are LLM-generated; the server labels them as such.
 

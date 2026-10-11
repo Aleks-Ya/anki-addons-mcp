@@ -6,6 +6,7 @@ from typing import Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from anki_addons_mcp.domain.compatibility import point_to_str, to_point
 from anki_addons_mcp.domain.models import AddonDetails, SnapshotInfo, Tag
 
 OLD = date(2026, 9, 1)
@@ -40,8 +41,30 @@ TAGS = [
 
 
 def _manifest(min_point: int | None, max_point: int | None) -> dict[str, Any]:
+    kind = "hard" if max_point and max_point < 0 else "tested" if max_point else "unknown"
     return {"package": "pkg", "name": "Pkg", "conflicts": ["other"], "min_point_version": min_point,
-            "max_point_version": max_point, "homepage": None, "mod": 1}
+            "max_point_version": max_point, "homepage": None, "mod": 1,
+            "min_version": point_to_str(min_point) if min_point is not None else None,
+            "max_version": point_to_str(abs(max_point)) if max_point else None, "max_version_kind": kind}
+
+
+def _addons_list_version(raw: str) -> tuple[int | None, str]:
+    if raw.startswith("<="):
+        return to_point(raw[2:]), "hard"
+    if raw.endswith("~"):
+        return to_point(raw), "tested"
+    return None, "unknown"
+
+
+def _branch(low: str | None, high: str | None, updated: str) -> dict[str, Any]:
+    if high == "+":
+        max_point, kind = None, "open"
+    elif high is None:
+        max_point, kind = None, "unknown"
+    else:
+        max_point, kind = to_point(high), "tested" if high.endswith("+") else "hard"
+    return {"min_version": low, "max_version": high, "updated": updated, "min_point_version": to_point(low),
+            "max_point_version": max_point, "max_version_kind": kind}
 
 
 def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislikes: int = 0,
@@ -50,6 +73,7 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
           ai_declaration: list[str] | None = None, lang: str | None = "en",
           github: dict[str, Any] | None = None, forum: dict[str, Any] | None = None,
           ai_summary: str | None = None, ai_tags: list[str] | None = None) -> dict[str, Any]:
+    point_version, version_kind = _addons_list_version(anki_version)
     return {
         "id": addon_id,
         "anki_web": {
@@ -61,8 +85,9 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
             "rating": rating,
             "update_date": update_date,
             "anki_version": anki_version,
-            "branches": [{"min_version": lo, "max_version": hi, "updated": update_date}
-                         for lo, hi in (branches or [("2.1.50", "+")])],
+            "anki_point_version": point_version,
+            "anki_version_kind": version_kind,
+            "branches": [_branch(lo, hi, update_date) for lo, hi in (branches or [("2.1.50", "+")])],
             "links": [f"https://example.com/{addon_id}"],
             "likes": likes,
             "dislikes": dislikes,
@@ -119,7 +144,7 @@ def latest_records() -> list[dict[str, Any]]:
                             manifest=_manifest(66, -250900), readme="# Image Occlusion\nOcclude images."),
               forum=forum(22, 120)),
         addon(HEATMAP, "Review Heatmap", rating=80, likes=82, dislikes=2, update_date="2024-01-10",
-              anki_version="2.1.20~", branches=[("2.1.20", "2.1.54")],
+              anki_version="<=2.1.54", branches=[("2.1.20", "2.1.54")],
               description="Heatmap of review history with streak counter.",
               ai_tags=["statistics", "progress-tracking"],
               github=github("carol", "review-heatmap", stars=200, last_commit="2023-12-01T00:00:00",

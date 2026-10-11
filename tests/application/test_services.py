@@ -7,7 +7,7 @@ from anki_addons_mcp.application.services import Services, build_services
 from anki_addons_mcp.application.snapshots import parse_snapshot
 from anki_addons_mcp.domain.compatibility import Support
 from anki_addons_mcp.domain.errors import AddonNotFound, InvalidQuery, SnapshotNotFound
-from anki_addons_mcp.domain.models import GroupField, TextKind
+from anki_addons_mcp.domain.models import GroupField, TextKind, VersionKind
 from anki_addons_mcp.domain.query import AddonFilters
 from tests.fixtures.dataset import (
     HEATMAP,
@@ -88,7 +88,14 @@ def test_compatibility(services: Services) -> None:
     verdicts = services.compatibility.check([KANJI, OCCLUSION, HEATMAP], "25.10")
     assert [v.verdict for v in verdicts] == [Support.SUPPORTED, Support.LIKELY, Support.UNSUPPORTED]
     assert verdicts[0].manifest_verdict == Support.SUPPORTED
-    assert verdicts[1].manifest_verdict == Support.LIKELY
+    assert verdicts[1].manifest_verdict == Support.UNSUPPORTED
+    assert verdicts[1].manifest_max_version == "25.09" and verdicts[1].manifest_max_version_kind == VersionKind.HARD
+    assert verdicts[0].anki_point_version == 251000
+    assert "tested the addon up to Anki 25.09" in verdicts[1].explanation
+    assert "hard upper limit of Anki 2.1.54" in verdicts[2].explanation
+    legacy = services.compatibility.check([LEGACY], "25.02")[0]
+    assert legacy.verdict == Support.UNKNOWN and "no upper version" in legacy.explanation
+    assert services.compatibility.check([NEW_ADDON], "24.11")[0].explanation.startswith("The addon requires at least")
     with pytest.raises(InvalidQuery):
         services.compatibility.check([KANJI], "latest")
     with pytest.raises(AddonNotFound):

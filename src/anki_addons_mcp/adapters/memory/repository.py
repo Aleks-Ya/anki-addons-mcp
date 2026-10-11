@@ -3,7 +3,7 @@ from collections import Counter
 from datetime import date
 from typing import Any
 
-from anki_addons_mcp.domain.compatibility import is_compatible
+from anki_addons_mcp.domain.compatibility import is_compatible, require_point
 from anki_addons_mcp.domain.errors import SnapshotNotFound
 from anki_addons_mcp.domain.models import (
     NONE_GROUP,
@@ -68,7 +68,12 @@ def _matches(d: AddonDetails, f: AddonFilters) -> bool:
     if f.has_ai_tooling is not None:
         checks.append(bool(gh and gh.ai_tooling_markers) == f.has_ai_tooling)
     if f.compatible_with_anki is not None:
-        checks.append(is_compatible(aw.branches, f.compatible_with_anki))
+        checks.append(is_compatible(aw.branches, require_point(f.compatible_with_anki)))
+    if f.anki_version_kind is not None:
+        checks.append(aw.anki_version_kind == f.anki_version_kind)
+    if f.anki_version_at_least is not None:
+        minimum = require_point(f.anki_version_at_least)
+        checks.append(aw.anki_point_version is not None and aw.anki_point_version >= minimum)
     if f.tags or f.exclude_tags:
         tags = {t.lower() for t in d.ai.tags} if d.ai else set()
         if f.tags:
@@ -107,6 +112,8 @@ def _sort_value(d: AddonDetails, field: SortField, score: float | None) -> Any:
             return gh.last_commit if gh else None
         case SortField.FORUM_POSTS:
             return d.forum.posts_count if d.forum else None
+        case SortField.ANKI_VERSION:
+            return d.anki_web.anki_point_version
 
 
 def _group_values(d: AddonDetails, field: GroupField) -> list[str | None]:
@@ -121,6 +128,8 @@ def _group_values(d: AddonDetails, field: GroupField) -> list[str | None]:
             return [aw.description_language]
         case GroupField.ANKI_VERSION:
             return [aw.anki_version]
+        case GroupField.ANKI_VERSION_KIND:
+            return [aw.anki_version_kind.value]
         case GroupField.UPDATE_YEAR:
             return [aw.update_date[:4] if aw.update_date else None]
         case GroupField.GITHUB_TOPIC:
@@ -204,7 +213,7 @@ class InMemoryAddonRepository(AddonRepository):
             points.append(AddonHistoryPoint(
                 snapshot=d, present=True, title=aw.title, rating=aw.rating, likes=aw.likes, dislikes=aw.dislikes,
                 github_stars=details.github.stars if details.github else None, update_date=aw.update_date,
-                anki_version=aw.anki_version,
+                anki_version=aw.anki_version, anki_version_kind=aw.anki_version_kind,
             ))
         return points
 

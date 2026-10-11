@@ -8,7 +8,7 @@ from mcp import Client
 from anki_addons_mcp.application.services import build_services
 from anki_addons_mcp.domain.ports import AddonRepository
 from anki_addons_mcp.interface.mcp.server import build_server
-from tests.fixtures.dataset import KANJI, NEW_ADDON, OCCLUSION, OLD
+from tests.fixtures.dataset import HEATMAP, KANJI, NEW_ADDON, OCCLUSION, OLD
 
 pytestmark = pytest.mark.anyio
 
@@ -20,7 +20,7 @@ EXPECTED_TOOLS = {
 EXPECTED_PROMPTS = {
     "find_addon_for_task", "compare_addons", "addon_health_report", "upgrade_readiness",
     "monthly_ecosystem_digest", "before_you_build", "author_portfolio", "best_in_category",
-    "category_landscape",
+    "category_landscape", "anki_release_readiness",
 }
 
 
@@ -49,8 +49,8 @@ async def test_lists_tools_with_read_only_annotations(client: Client, repository
 async def test_lists_prompts_and_resources(client: Client) -> None:
     assert {p.name for p in (await client.list_prompts()).prompts} == EXPECTED_PROMPTS
     assert {str(r.uri) for r in (await client.list_resources()).resources} == {
-        "anki-addons://dataset/readme", "anki-addons://dataset/schema", "anki-addons://snapshots",
-        "anki-addons://tags"}
+        "anki-addons://dataset/readme", "anki-addons://dataset/schema", "anki-addons://dataset/anki-versions",
+        "anki-addons://snapshots", "anki-addons://tags"}
     templates = {t.uri_template for t in (await client.list_resource_templates()).resource_templates}
     assert "anki-addons://addons/{addon_id}" in templates
     assert "anki-addons://tags/{tag}" in templates
@@ -121,6 +121,14 @@ async def test_texts(client: Client) -> None:
 async def test_compatibility_and_maintenance(client: Client) -> None:
     verdicts = await call(client, "check_compatibility", addon_ids=[KANJI, OCCLUSION], anki_version="25.10")
     assert [v["verdict"] for v in verdicts["result"]] == ["supported", "likely"]
+    assert verdicts["result"][1]["matching_branch"]["max_version_kind"] == "tested"
+    page = await call(client, "filter_addons", anki_version_kind="hard")
+    assert [c["id"] for c in page["items"]] == [HEATMAP]
+    assert page["items"][0]["anki_point_version"] == 54
+    newest = await call(client, "filter_addons", sort_by="anki_version", limit=1)
+    assert newest["items"][0]["anki_version"] == "25.09~"
+    bad = await client.call_tool("filter_addons", {"compatible_with_anki": "latest"})
+    assert bad.is_error
     report = await call(client, "assess_maintenance", addon_id=KANJI)
     assert report["label"] == "active"
 
@@ -186,3 +194,8 @@ async def test_prompt(client: Client) -> None:
     prompt = await client.get_prompt("upgrade_readiness", {"addon_ids": "1,2", "target_anki_version": "25.02"})
     text = prompt.messages[0].content.text  # type: ignore[union-attr]
     assert "check_compatibility" in text and "25.02" in text
+    readiness = await client.get_prompt("anki_release_readiness", {"anki_version": "26.05"})
+    text = readiness.messages[0].content.text  # type: ignore[union-attr]
+    assert "compatible_with_anki=26.05" in text and "anki_version_kind" in text
+    guide = (await client.read_resource("anki-addons://dataset/anki-versions")).contents[0].text  # type: ignore[union-attr]
+    assert "231000" in guide and "hard" in guide

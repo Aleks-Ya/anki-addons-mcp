@@ -14,6 +14,45 @@ JSON = "application/json"
 _SNAPSHOTS = TypeAdapter(list[SnapshotInfo])
 _TAGS = TypeAdapter(list[TagUsage])
 
+ANKI_VERSIONS_GUIDE = """# Anki versions in the dataset
+
+Every addon keeps the raw version strings as AnkiWeb shows them and parsed values that follow Anki's own rules.
+
+## Point version
+Anki encodes a version as one sortable integer (as strings, `2.1.66` > `23.10` would sort wrongly):
+
+| Version | Point version | Rule |
+|---|---|---|
+| `2.1.66` | `66` | `2.1.x` -> `x` |
+| `23.10` | `231000` | `YY.MM` -> `YYMM00` |
+| `25.09.2` | `250902` | `YY.MM.PP` -> `YYMMPP` |
+| `26.05b1` | `260500` | a beta/rc suffix decodes to its base release |
+
+## Max version kind
+| Kind | Meaning |
+|---|---|
+| `hard` | Anki disables the addon on any newer version |
+| `tested` | the author tested up to this version; newer versions still run it |
+| `open` | no upper limit |
+| `unknown` | the author gave no upper version |
+
+## Fields
+- `anki_web.anki_version` (raw: `B~` tested, `<=B` hard, empty unknown), `anki_point_version`, `anki_version_kind`:
+  the newest supported version from the AnkiWeb addons list.
+- `anki_web.branches[]`: `min_version`/`max_version` raw (`A-B+` tested, `A-B` hard, `A+` open, `A` unknown),
+  `min_point_version`, `max_point_version`, `max_version_kind`.
+- `github.manifest`: `min_point_version`/`max_point_version` as the author wrote them (negative max = hard),
+  `min_version`, `max_version`, `max_version_kind` parsed. Manifest values are often odd (`260000` gives
+  "26.00"), so the AnkiWeb branches are the more reliable source.
+
+## Compatibility verdicts (check_compatibility, compatible_with_anki)
+- supported: a branch covers the version (between min and max, or open-ended).
+- likely: the version is above a `tested` max; Anki still runs the addon, untested.
+- unsupported: below every branch minimum, or above a `hard` max.
+- unknown: the only matching branch has no upper version, or there is no version data.
+The compatible_with_anki filter keeps supported and likely addons.
+"""
+
 
 def _json(model: BaseModel) -> str:
     return model.model_dump_json(indent=2)
@@ -31,6 +70,12 @@ def register_resources(mcp: MCPServer, services: Services) -> None:
                   description="JSON Schema of the full addon record returned by get_addon")
     def dataset_schema() -> str:
         return json.dumps(AddonDetails.model_json_schema(mode="serialization"), indent=2)
+
+    @mcp.resource("anki-addons://dataset/anki-versions", mime_type="text/markdown",
+                  description="How Anki versions are encoded (point versions, hard/tested/open/unknown kinds) "
+                              "and how compatibility verdicts are derived")
+    def anki_versions() -> str:
+        return ANKI_VERSIONS_GUIDE
 
     @mcp.resource("anki-addons://snapshots", mime_type=JSON, description="Available snapshots with metadata")
     def snapshots() -> str:

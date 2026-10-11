@@ -1,8 +1,10 @@
+import re
 from enum import StrEnum
 
-from anki_addons_mcp.domain.models import Branch, Manifest
+from anki_addons_mcp.domain.errors import InvalidQuery
+from anki_addons_mcp.domain.models import Branch, Manifest, VersionKind
 
-Version = tuple[int, ...]
+_VERSION = re.compile(r"\s*(\d+)\.(\d+)(?:\.(\d+))?")
 
 
 class Support(StrEnum):
@@ -15,74 +17,72 @@ class Support(StrEnum):
 _RANK = {Support.SUPPORTED: 3, Support.LIKELY: 2, Support.UNSUPPORTED: 1, Support.UNKNOWN: 0}
 
 
-def parse_version(value: str | None) -> Version | None:
-    if not value:
+def to_point(value: str | None) -> int | None:
+    """Anki's point version: 2.1.x -> x, YY.MM[.PP] -> YYMMPP; a beta/rc suffix decodes to its base release."""
+    match = _VERSION.match(value or "")
+    if not match:
         return None
-    cleaned = value.strip().rstrip("+~").strip()
-    parts = cleaned.split(".")
-    if not cleaned or not all(part.isdigit() for part in parts):
-        return None
-    return tuple(int(part) for part in parts)
+    major, minor, patch = int(match.group(1)), int(match.group(2)), int(match.group(3) or 0)
+    if major == 2:
+        return patch
+    return major * 10_000 + minor * 100 + patch
 
 
-def _cmp(left: Version, right: Version) -> int:
-    width = max(len(left), len(right))
-    a = left + (0,) * (width - len(left))
-    b = right + (0,) * (width - len(right))
-    return (a > b) - (a < b)
+def require_point(value: str) -> int:
+    point = to_point(value)
+    if point is None:
+        raise InvalidQuery(f"Cannot parse Anki version '{value}'. Use a form like 25.02 or 2.1.66")
+    return point
 
 
-def branch_support(branch: Branch, version: Version) -> Support:
-    low = parse_version(branch.min_version)
+def point_to_str(point: int) -> str:
+    if point <= 99:
+        return f"2.1.{point}"
+    version = f"{point // 10_000:02}.{point // 100 % 100:02}"
+    return f"{version}.{point % 100}" if point % 100 else version
+
+
+def branch_support(branch: Branch, point: int) -> Support:
+    low = branch.min_point_version
     if low is None:
         return Support.UNKNOWN
-    if _cmp(version, low) < 0:
+    if point < low:
         return Support.UNSUPPORTED
-    high_raw = (branch.max_version or "").strip()
-    if not high_raw:
-        return Support.SUPPORTED if _cmp(version, low) == 0 else Support.UNSUPPORTED
-    if high_raw == "+":
-        return Support.SUPPORTED
-    high = parse_version(high_raw)
-    if high is None:
-        return Support.UNKNOWN
-    if _cmp(version, high) <= 0:
-        return Support.SUPPORTED
-    return Support.LIKELY if high_raw.endswith("+") else Support.UNSUPPORTED
+    high = branch.max_point_version
+    match branch.max_version_kind:
+        case VersionKind.OPEN:
+            return Support.SUPPORTED
+        case VersionKind.HARD if high is not None:
+            return Support.SUPPORTED if point <= high else Support.UNSUPPORTED
+        case VersionKind.TESTED if high is not None:
+            return Support.SUPPORTED if point <= high else Support.LIKELY
+        case VersionKind.UNKNOWN:
+            return Support.SUPPORTED if point == low else Support.UNKNOWN
+    return Support.UNKNOWN
 
 
-def addon_support(branches: list[Branch], version: Version) -> tuple[Support, Branch | None]:
+def addon_support(branches: list[Branch], point: int) -> tuple[Support, Branch | None]:
     best: tuple[Support, Branch | None] = (Support.UNKNOWN, None)
     for branch in branches:
-        support = branch_support(branch, version)
+        support = branch_support(branch, point)
         if _RANK[support] > _RANK[best[0]]:
             best = (support, branch)
     return best
 
 
-def is_compatible(branches: list[Branch], version_text: str) -> bool:
-    version = parse_version(version_text)
-    if version is None:
-        return False
-    return addon_support(branches, version)[0] in (Support.SUPPORTED, Support.LIKELY)
+def is_compatible(branches: list[Branch], point: int) -> bool:
+    return addon_support(branches, point)[0] in (Support.SUPPORTED, Support.LIKELY)
 
 
-def point_version(version: Version) -> int:
-    if len(version) >= 2 and version[0] == 2 and version[1] == 1:
-        return version[2] if len(version) > 2 else 0
-    padded = version + (0,) * (3 - len(version))
-    return padded[0] * 10000 + padded[1] * 100 + padded[2]
-
-
-def manifest_support(manifest: Manifest | None, version: Version) -> Support:
+def manifest_support(manifest: Manifest | None, point: int) -> Support:
     if manifest is None or (manifest.min_point_version is None and manifest.max_point_version is None):
         return Support.UNKNOWN
-    point = point_version(version)
     if manifest.min_point_version is not None and point < manifest.min_point_version:
         return Support.UNSUPPORTED
-    maximum = manifest.max_point_version
-    if maximum is None or maximum == 0:
-        return Support.SUPPORTED
-    if maximum < 0:
-        return Support.SUPPORTED if point <= -maximum else Support.LIKELY
-    return Support.SUPPORTED if point <= maximum else Support.UNSUPPORTED
+    high = abs(manifest.max_point_version or 0)
+    match manifest.max_version_kind:
+        case VersionKind.HARD:
+            return Support.SUPPORTED if point <= high else Support.UNSUPPORTED
+        case VersionKind.TESTED:
+            return Support.SUPPORTED if point <= high else Support.LIKELY
+    return Support.SUPPORTED

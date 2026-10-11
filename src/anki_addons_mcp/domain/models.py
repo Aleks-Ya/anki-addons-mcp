@@ -1,16 +1,29 @@
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, computed_field, field_validator
+from pydantic import BaseModel, BeforeValidator, Field, computed_field, field_validator
 
 AI_PROVENANCE = "LLM-generated summary and tags; may contain mistakes. Verify against the description or README."
+
+
+class VersionKind(StrEnum):
+    HARD = "hard"
+    TESTED = "tested"
+    OPEN = "open"
+    UNKNOWN = "unknown"
+
+
+Kind = Annotated[VersionKind, BeforeValidator(lambda value: value or VersionKind.UNKNOWN)]
 
 
 class Branch(BaseModel):
     min_version: str | None = None
     max_version: str | None = None
     updated: str | None = None
+    min_point_version: int | None = None
+    max_point_version: int | None = None
+    max_version_kind: Kind = VersionKind.UNKNOWN
 
 
 class AnkiWebInfo(BaseModel):
@@ -20,6 +33,8 @@ class AnkiWebInfo(BaseModel):
     rating: int = 0
     update_date: str | None = None
     anki_version: str | None = None
+    anki_point_version: int | None = None
+    anki_version_kind: Kind = VersionKind.UNKNOWN
     branches: list[Branch] = Field(default_factory=list)
     links: list[str] = Field(default_factory=list)
     likes: int = 0
@@ -53,6 +68,9 @@ class Manifest(BaseModel):
     max_point_version: int | None = None
     homepage: str | None = None
     mod: int | None = None
+    min_version: str | None = None
+    max_version: str | None = None
+    max_version_kind: Kind = VersionKind.UNKNOWN
 
 
 class GithubInfo(BaseModel):
@@ -127,6 +145,8 @@ class AddonCard(BaseModel):
     dislikes: int
     update_date: str | None = None
     anki_version: str | None = None
+    anki_point_version: int | None = None
+    anki_version_kind: Kind = VersionKind.UNKNOWN
     ai_summary: str | None = Field(default=None, description=AI_PROVENANCE)
     github_user: str | None = None
     github_repo: str | None = None
@@ -150,6 +170,8 @@ class AddonCard(BaseModel):
             dislikes=details.anki_web.dislikes,
             update_date=details.anki_web.update_date,
             anki_version=details.anki_web.anki_version,
+            anki_point_version=details.anki_web.anki_point_version,
+            anki_version_kind=details.anki_web.anki_version_kind,
             ai_summary=details.ai.summary if details.ai else None,
             github_user=github.user if github else None,
             github_repo=github.repo if github else None,
@@ -200,6 +222,7 @@ class AddonHistoryPoint(BaseModel):
     github_stars: int | None = None
     update_date: str | None = None
     anki_version: str | None = None
+    anki_version_kind: VersionKind | None = None
 
 
 class TextKind(StrEnum):
@@ -212,6 +235,7 @@ class GroupField(StrEnum):
     PRIMARY_LANGUAGE = "primary_language"
     DESCRIPTION_LANGUAGE = "description_language"
     ANKI_VERSION = "anki_version"
+    ANKI_VERSION_KIND = "anki_version_kind"
     UPDATE_YEAR = "update_year"
     GITHUB_TOPIC = "github_topic"
     AI_DECLARATION_MARKER = "ai_declaration_marker"
