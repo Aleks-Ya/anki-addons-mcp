@@ -127,7 +127,6 @@ class AddonCard(BaseModel):
     update_date: str | None = None
     anki_version: str | None = None
     ai_summary: str | None = Field(default=None, description=AI_PROVENANCE)
-    ai_model: str | None = None
     github_user: str | None = None
     github_repo: str | None = None
     github_stars: int | None = None
@@ -150,7 +149,6 @@ class AddonCard(BaseModel):
             update_date=details.anki_web.update_date,
             anki_version=details.anki_web.anki_version,
             ai_summary=details.ai.summary if details.ai else None,
-            ai_model=details.ai.model if details.ai else None,
             github_user=github.user if github else None,
             github_repo=github.repo if github else None,
             github_stars=github.stars if github else None,

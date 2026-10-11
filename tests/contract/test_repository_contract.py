@@ -153,7 +153,7 @@ def test_card_fields(repository: AddonRepository) -> None:
     assert card.title == "Kanji Helper"
     assert card.github_user == "alice" and card.github_stars == 50
     assert card.license == "MIT" and card.forum_posts_count == 30
-    assert card.ai_model == "test-model"
+    assert "ai_model" not in card.model_dump()
     no_github = repository.find(AddonQuery(filters=AddonFilters(addon_ids=[NO_GITHUB]))).items[0]
     assert no_github.anki_version is None and no_github.github_stars is None
 
