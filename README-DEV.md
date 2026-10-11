@@ -147,6 +147,9 @@ Space: https://huggingface.co/spaces/Ya-Alex/anki-addons-mcp
 The endpoint is `https://ya-alex-anki-addons-mcp.hf.space/mcp`. The Space loads the latest snapshot at
 startup; its disk is ephemeral, so snapshots are downloaded again after a restart.
 
+Step 2 for an existing Space is automated by the skill `/deploy`: it pushes `main` after a green CI run, waits
+for the rebuild and smoke-tests the endpoint.
+
 ## Release a new version
 
 The version lives in `src/anki_addons_mcp/__init__.py` (`__version__`) and is bumped with
