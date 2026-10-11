@@ -24,6 +24,20 @@ class CompatibilityVerdict(BaseModel):
     explanation: str
 
 
+def _unsupported_reason(anki_web: AnkiWebInfo, point: int) -> str:
+    branches = anki_web.branches
+    lows = [b.min_point_version for b in branches if b.min_point_version is not None]
+    if lows and point < min(lows):
+        return f"The addon requires at least Anki {point_to_str(min(lows))}."
+    hard = [b.max_point_version for b in branches
+            if b.max_version_kind == VersionKind.HARD and b.max_point_version is not None]
+    if anki_web.anki_version_kind == VersionKind.HARD and anki_web.anki_point_version is not None:
+        hard.append(anki_web.anki_point_version)
+    if hard:
+        return f"The addon has a hard upper limit of Anki {point_to_str(max(hard))}; Anki disables it on newer versions."
+    return "No AnkiWeb branch covers this Anki version."
+
+
 def _explain(verdict: Support, branch: Branch | None, anki_web: AnkiWebInfo, point: int) -> str:
     branches = anki_web.branches
     if verdict == Support.SUPPORTED:
@@ -37,16 +51,7 @@ def _explain(verdict: Support, branch: Branch | None, anki_web: AnkiWebInfo, poi
         return (f"The branch starting at Anki {open_ended[-1].min_version} gives no upper version, so support "
                 "for this version is unknown.")
     if verdict == Support.UNSUPPORTED:
-        lows = [b.min_point_version for b in branches if b.min_point_version is not None]
-        if lows and point < min(lows):
-            return f"The addon requires at least Anki {point_to_str(min(lows))}."
-        hard = [b.max_point_version for b in branches
-                if b.max_version_kind == VersionKind.HARD and b.max_point_version is not None]
-        if anki_web.anki_version_kind == VersionKind.HARD and anki_web.anki_point_version is not None:
-            hard.append(anki_web.anki_point_version)
-        if hard:
-            return f"The addon has a hard upper limit of Anki {point_to_str(max(hard))}; Anki disables it on newer versions."
-        return "No AnkiWeb branch covers this Anki version."
+        return _unsupported_reason(anki_web, point)
     return "The addon publishes no parsable version information."
 
 

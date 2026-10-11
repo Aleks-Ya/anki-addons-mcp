@@ -162,13 +162,16 @@ def test_card_fields(repository: AddonRepository) -> None:
     assert "ai_model" not in card.model_dump()
     no_github = repository.find(AddonQuery(filters=AddonFilters(addon_ids=[NO_GITHUB]))).items[0]
     assert no_github.anki_version is None and no_github.github_stars is None
-    assert no_github.anki_point_version is None and no_github.anki_version_kind == VersionKind.UNKNOWN
+    assert no_github.anki_point_version is None
+    assert no_github.anki_version_kind == VersionKind.UNKNOWN
     assert (card.anki_point_version, card.anki_version_kind) == (250200, VersionKind.TESTED)
 
 
 def test_parsed_versions_in_details(repository: AddonRepository) -> None:
     details = repository.get_addon(OCCLUSION)
-    assert details is not None and details.github is not None and details.github.manifest is not None
+    assert details is not None
+    assert details.github is not None
+    assert details.github.manifest is not None
     branch = details.anki_web.branches[0]
     assert (branch.min_point_version, branch.max_point_version, branch.max_version_kind) == (
         66, 250900, VersionKind.TESTED)
@@ -179,8 +182,9 @@ def test_parsed_versions_in_details(repository: AddonRepository) -> None:
 
 
 def test_invalid_anki_version_filter(repository: AddonRepository) -> None:
+    query = AddonQuery(filters=AddonFilters(compatible_with_anki="latest"))
     with pytest.raises(InvalidQuery):
-        repository.find(AddonQuery(filters=AddonFilters(compatible_with_anki="latest")))
+        repository.find(query)
 
 
 def test_history(repository: AddonRepository) -> None:

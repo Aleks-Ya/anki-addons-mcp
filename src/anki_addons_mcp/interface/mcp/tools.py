@@ -62,7 +62,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         "Structured addon query. All filters are optional and combined with AND. "
         "Returns addon cards and the total number of matches. sort_by=anki_version orders by the newest "
         "supported Anki version."))
-    def filter_addons(
+    def filter_addons(  # NOSONAR - each filter is a flat tool parameter in the MCP input schema
         min_rating: int | None = None, min_likes: int | None = None, min_stars: int | None = None,
         has_github: bool | None = None, has_tests: bool | None = None, has_forum: bool | None = None,
         license: Annotated[str | None, Field(description="SPDX id, e.g. MIT, GPL-3.0, AGPL-3.0")] = None,

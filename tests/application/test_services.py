@@ -89,12 +89,14 @@ def test_compatibility(services: Services) -> None:
     assert [v.verdict for v in verdicts] == [Support.SUPPORTED, Support.LIKELY, Support.UNSUPPORTED]
     assert verdicts[0].manifest_verdict == Support.SUPPORTED
     assert verdicts[1].manifest_verdict == Support.UNSUPPORTED
-    assert verdicts[1].manifest_max_version == "25.09" and verdicts[1].manifest_max_version_kind == VersionKind.HARD
+    assert verdicts[1].manifest_max_version == "25.09"
+    assert verdicts[1].manifest_max_version_kind == VersionKind.HARD
     assert verdicts[0].anki_point_version == 251000
     assert "tested the addon up to Anki 25.09" in verdicts[1].explanation
     assert "hard upper limit of Anki 2.1.54" in verdicts[2].explanation
     legacy = services.compatibility.check([LEGACY], "25.02")[0]
-    assert legacy.verdict == Support.UNKNOWN and "no upper version" in legacy.explanation
+    assert legacy.verdict == Support.UNKNOWN
+    assert "no upper version" in legacy.explanation
     assert services.compatibility.check([NEW_ADDON], "24.11")[0].explanation.startswith("The addon requires at least")
     with pytest.raises(InvalidQuery):
         services.compatibility.check([KANJI], "latest")

@@ -1,5 +1,6 @@
 import re
 from collections import Counter
+from collections.abc import Callable
 from datetime import date
 from typing import Any
 
@@ -11,6 +12,8 @@ from anki_addons_mcp.domain.models import (
     AddonDetails,
     AddonHistoryPoint,
     Aggregation,
+    AnkiWebInfo,
+    GithubInfo,
     GroupField,
     Page,
     SnapshotInfo,
@@ -27,8 +30,7 @@ def _lower(value: str | None) -> str | None:
     return value.lower() if value else None
 
 
-def _matches(d: AddonDetails, f: AddonFilters) -> bool:
-    gh = d.github
+def _anki_web_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
     aw = d.anki_web
     checks: list[bool] = []
     if f.addon_ids is not None:
@@ -37,36 +39,46 @@ def _matches(d: AddonDetails, f: AddonFilters) -> bool:
         checks.append(aw.rating >= f.min_rating)
     if f.min_likes is not None:
         checks.append(aw.likes >= f.min_likes)
+    if f.has_forum is not None:
+        checks.append(bool(d.forum and d.forum.anki_forum_url) == f.has_forum)
+    if f.description_language is not None:
+        checks.append(_lower(aw.description_language) == f.description_language.lower())
+    if f.updated_after is not None:
+        checks.append(bool(aw.update_date) and (aw.update_date or "") >= f.updated_after.isoformat())
+    if f.updated_before is not None:
+        checks.append(bool(aw.update_date) and (aw.update_date or "") <= f.updated_before.isoformat())
+    if f.has_ai_declaration is not None:
+        checks.append(bool(aw.ai_declaration_markers) == f.has_ai_declaration)
+    return checks
+
+
+def _github_checks(gh: GithubInfo | None, f: AddonFilters) -> list[bool]:
+    checks: list[bool] = []
     if f.min_stars is not None:
         checks.append(gh is not None and gh.stars >= f.min_stars)
     if f.has_github is not None:
         checks.append((gh is not None) == f.has_github)
     if f.has_tests is not None:
         checks.append(bool(gh and gh.tests_count) == f.has_tests)
-    if f.has_forum is not None:
-        checks.append(bool(d.forum and d.forum.anki_forum_url) == f.has_forum)
     if f.license is not None:
         checks.append(gh is not None and _lower(gh.license) == f.license.lower())
     if f.language is not None:
         language = f.language.lower()
         checks.append(gh is not None and (language in [x.lower() for x in gh.languages]
                                           or _lower(gh.primary_language) == language))
-    if f.description_language is not None:
-        checks.append(_lower(aw.description_language) == f.description_language.lower())
     if f.github_user is not None:
         checks.append(gh is not None and _lower(gh.user) == f.github_user.lower())
     if f.topic is not None:
         checks.append(gh is not None and f.topic.lower() in [x.lower() for x in gh.topics])
-    if f.updated_after is not None:
-        checks.append(bool(aw.update_date) and (aw.update_date or "") >= f.updated_after.isoformat())
-    if f.updated_before is not None:
-        checks.append(bool(aw.update_date) and (aw.update_date or "") <= f.updated_before.isoformat())
     if f.archived is not None:
         checks.append(bool(gh and gh.archived) == f.archived)
-    if f.has_ai_declaration is not None:
-        checks.append(bool(aw.ai_declaration_markers) == f.has_ai_declaration)
     if f.has_ai_tooling is not None:
         checks.append(bool(gh and gh.ai_tooling_markers) == f.has_ai_tooling)
+    return checks
+
+
+def _version_checks(aw: AnkiWebInfo, f: AddonFilters) -> list[bool]:
+    checks: list[bool] = []
     if f.compatible_with_anki is not None:
         checks.append(is_compatible(aw.branches, require_point(f.compatible_with_anki)))
     if f.anki_version_kind is not None:
@@ -74,13 +86,22 @@ def _matches(d: AddonDetails, f: AddonFilters) -> bool:
     if f.anki_version_at_least is not None:
         minimum = require_point(f.anki_version_at_least)
         checks.append(aw.anki_point_version is not None and aw.anki_point_version >= minimum)
-    if f.tags or f.exclude_tags:
-        tags = {t.lower() for t in d.ai.tags} if d.ai else set()
-        if f.tags:
-            checks.append({t.lower() for t in f.tags} <= tags)
-        if f.exclude_tags:
-            checks.append(not ({t.lower() for t in f.exclude_tags} & tags))
-    return all(checks)
+    return checks
+
+
+def _tag_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
+    tags = {t.lower() for t in d.ai.tags} if d.ai else set()
+    checks: list[bool] = []
+    if f.tags:
+        checks.append({t.lower() for t in f.tags} <= tags)
+    if f.exclude_tags:
+        checks.append(not ({t.lower() for t in f.exclude_tags} & tags))
+    return checks
+
+
+def _matches(d: AddonDetails, f: AddonFilters) -> bool:
+    return all(_anki_web_checks(d, f) + _github_checks(d.github, f) + _version_checks(d.anki_web, f)
+               + _tag_checks(d, f))
 
 
 def _score(d: AddonDetails, terms: list[str]) -> float:
@@ -116,30 +137,19 @@ def _sort_value(d: AddonDetails, field: SortField, score: float | None) -> Any:
             return d.anki_web.anki_point_version
 
 
-def _group_values(d: AddonDetails, field: GroupField) -> list[str | None]:
-    gh = d.github
-    aw = d.anki_web
-    match field:
-        case GroupField.LICENSE:
-            return [gh.license if gh else None]
-        case GroupField.PRIMARY_LANGUAGE:
-            return [gh.primary_language if gh else None]
-        case GroupField.DESCRIPTION_LANGUAGE:
-            return [aw.description_language]
-        case GroupField.ANKI_VERSION:
-            return [aw.anki_version]
-        case GroupField.ANKI_VERSION_KIND:
-            return [aw.anki_version_kind.value]
-        case GroupField.UPDATE_YEAR:
-            return [aw.update_date[:4] if aw.update_date else None]
-        case GroupField.GITHUB_TOPIC:
-            return list(gh.topics) if gh and gh.topics else [None]
-        case GroupField.AI_DECLARATION_MARKER:
-            return list(aw.ai_declaration_markers) or [None]
-        case GroupField.AI_TOOLING_MARKER:
-            return list(gh.ai_tooling_markers) if gh and gh.ai_tooling_markers else [None]
-        case GroupField.AI_TAG:
-            return list(d.ai.tags) if d.ai and d.ai.tags else [None]
+_GROUP_VALUES: dict[GroupField, Callable[[AddonDetails], list[str | None]]] = {
+    GroupField.LICENSE: lambda d: [d.github.license if d.github else None],
+    GroupField.PRIMARY_LANGUAGE: lambda d: [d.github.primary_language if d.github else None],
+    GroupField.DESCRIPTION_LANGUAGE: lambda d: [d.anki_web.description_language],
+    GroupField.ANKI_VERSION: lambda d: [d.anki_web.anki_version],
+    GroupField.ANKI_VERSION_KIND: lambda d: [d.anki_web.anki_version_kind.value],
+    GroupField.UPDATE_YEAR: lambda d: [d.anki_web.update_date[:4] if d.anki_web.update_date else None],
+    GroupField.GITHUB_TOPIC: lambda d: list(d.github.topics) if d.github and d.github.topics else [None],
+    GroupField.AI_DECLARATION_MARKER: lambda d: list(d.anki_web.ai_declaration_markers) or [None],
+    GroupField.AI_TOOLING_MARKER:
+        lambda d: list(d.github.ai_tooling_markers) if d.github and d.github.ai_tooling_markers else [None],
+    GroupField.AI_TAG: lambda d: list(d.ai.tags) if d.ai and d.ai.tags else [None],
+}
 
 
 class InMemoryAddonRepository(AddonRepository):
@@ -229,7 +239,7 @@ class InMemoryAddonRepository(AddonRepository):
     def group_counts(self, field: GroupField, snapshot: date | None = None) -> dict[str, int]:
         counter: Counter[str] = Counter()
         for details in self._data(snapshot).values():
-            for value in _group_values(details, field):
+            for value in _GROUP_VALUES[field](details):
                 counter[value or NONE_GROUP] += 1
         return dict(counter)
 

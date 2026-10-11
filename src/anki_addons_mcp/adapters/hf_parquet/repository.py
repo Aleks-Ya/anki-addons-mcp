@@ -85,49 +85,51 @@ def _lower_all(values: list[str]) -> list[str]:
     return [v.lower() for v in values]
 
 
-def _filters_sql(f: AddonFilters) -> tuple[list[str], list[Any]]:
-    clauses: list[str] = []
-    params: list[Any] = []
+_Add = Callable[..., None]
 
-    def add(clause: str, *values: Any) -> None:
-        clauses.append(clause)
-        params.extend(values)
 
+def _anki_web_filters(f: AddonFilters, add: _Add) -> None:
     if f.addon_ids is not None:
         add("list_contains(?, id)", f.addon_ids)
     if f.min_rating is not None:
         add("rating >= ?", f.min_rating)
     if f.min_likes is not None:
         add("likes >= ?", f.min_likes)
+    if f.has_forum is not None:
+        add("has_forum = ?", f.has_forum)
+    if f.description_language is not None:
+        add("lower(description_language) = lower(?)", f.description_language)
+    if f.updated_after is not None:
+        add("NULLIF(update_date, '') >= ?", f.updated_after.isoformat())
+    if f.updated_before is not None:
+        add("NULLIF(update_date, '') <= ?", f.updated_before.isoformat())
+    if f.has_ai_declaration is not None:
+        add("(coalesce(len(ai_declaration_markers), 0) > 0) = ?", f.has_ai_declaration)
+
+
+def _github_filters(f: AddonFilters, add: _Add) -> None:
     if f.min_stars is not None:
         add("has_github AND github_stars >= ?", f.min_stars)
     if f.has_github is not None:
         add("has_github = ?", f.has_github)
     if f.has_tests is not None:
         add("(coalesce(github_tests_count, 0) > 0) = ?", f.has_tests)
-    if f.has_forum is not None:
-        add("has_forum = ?", f.has_forum)
     if f.license is not None:
         add("lower(github_license) = lower(?)", f.license)
     if f.language is not None:
         add("(list_contains(list_transform(github_languages, lambda x: lower(x)), lower(?))"
             " OR lower(github_primary_language) = lower(?))", f.language, f.language)
-    if f.description_language is not None:
-        add("lower(description_language) = lower(?)", f.description_language)
     if f.github_user is not None:
         add("lower(github_user) = lower(?)", f.github_user)
     if f.topic is not None:
         add("list_contains(list_transform(github_topics, lambda x: lower(x)), lower(?))", f.topic)
-    if f.updated_after is not None:
-        add("NULLIF(update_date, '') >= ?", f.updated_after.isoformat())
-    if f.updated_before is not None:
-        add("NULLIF(update_date, '') <= ?", f.updated_before.isoformat())
     if f.archived is not None:
         add("coalesce(github_archived, false) = ?", f.archived)
-    if f.has_ai_declaration is not None:
-        add("(coalesce(len(ai_declaration_markers), 0) > 0) = ?", f.has_ai_declaration)
     if f.has_ai_tooling is not None:
         add("(coalesce(len(github_ai_tooling_markers), 0) > 0) = ?", f.has_ai_tooling)
+
+
+def _version_and_tag_filters(f: AddonFilters, add: _Add) -> None:
     if f.compatible_with_anki is not None:
         add(_COMPATIBLE_BRANCH.replace("$p", str(require_point(f.compatible_with_anki))))
     if f.anki_version_kind is not None:
@@ -138,6 +140,19 @@ def _filters_sql(f: AddonFilters) -> tuple[list[str], list[Any]]:
         add(f"list_has_all({_LOWER_TAGS}, ?)", _lower_all(f.tags))
     if f.exclude_tags:
         add(f"NOT list_has_any(coalesce({_LOWER_TAGS}, []), ?)", _lower_all(f.exclude_tags))
+
+
+def _filters_sql(f: AddonFilters) -> tuple[list[str], list[Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+
+    def add(clause: str, *values: Any) -> None:
+        clauses.append(clause)
+        params.extend(values)
+
+    _anki_web_filters(f, add)
+    _github_filters(f, add)
+    _version_and_tag_filters(f, add)
     return [f"coalesce({c}, false)" for c in clauses], params
 
 

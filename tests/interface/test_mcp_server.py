@@ -196,6 +196,8 @@ async def test_prompt(client: Client) -> None:
     assert "check_compatibility" in text and "25.02" in text
     readiness = await client.get_prompt("anki_release_readiness", {"anki_version": "26.05"})
     text = readiness.messages[0].content.text  # type: ignore[union-attr]
-    assert "compatible_with_anki=26.05" in text and "anki_version_kind" in text
+    assert "compatible_with_anki=26.05" in text
+    assert "anki_version_kind" in text
     guide = (await client.read_resource("anki-addons://dataset/anki-versions")).contents[0].text  # type: ignore[union-attr]
-    assert "231000" in guide and "hard" in guide
+    assert "231000" in guide
+    assert "hard" in guide

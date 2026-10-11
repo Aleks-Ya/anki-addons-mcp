@@ -56,7 +56,8 @@ def test_addon_support_picks_best_branch() -> None:
     branches = [Branch(min_point_version=0, max_point_version=49, max_version_kind=HARD),
                 Branch(min_point_version=231000, max_version_kind=OPEN)]
     support, branch = addon_support(branches, 250200)
-    assert support == Support.SUPPORTED and branch == branches[1]
+    assert support == Support.SUPPORTED
+    assert branch == branches[1]
     assert addon_support([], 250200) == (Support.UNKNOWN, None)
 
 
