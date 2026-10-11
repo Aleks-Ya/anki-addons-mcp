@@ -77,8 +77,15 @@ npx @modelcontextprotocol/inspector
 In the UI, set **Transport Type** to *Streamable HTTP* and **URL** to `http://localhost:8000/mcp`, then
 click **Connect**. For the Docker image, use `http://localhost:7860/mcp`.
 
-**Deployed Space.** Connect the Inspector the same way, with **URL** set to
-`https://ya-alex-anki-addons-mcp.hf.space/mcp`. The CLI mode runs a single request and prints the JSON:
+**Deployed Space.** Open the Inspector UI already connected to the Space:
+
+```bash
+npx @modelcontextprotocol/inspector --transport http --server-url https://ya-alex-anki-addons-mcp.hf.space/mcp
+```
+
+The UI opens at `http://localhost:6274` with **Transport Type** set to *Streamable HTTP* and **URL** set to
+`https://ya-alex-anki-addons-mcp.hf.space/mcp`; click **Connect**. The CLI mode runs a single request and
+prints the JSON:
 
 ```bash
 npx @modelcontextprotocol/inspector --cli https://ya-alex-anki-addons-mcp.hf.space/mcp --transport http --method tools/list
