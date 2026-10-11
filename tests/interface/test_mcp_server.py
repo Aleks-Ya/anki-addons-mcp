@@ -62,6 +62,15 @@ async def test_search(client: Client) -> None:
     assert {item["id"] for item in page["items"]} == {KANJI, NEW_ADDON}
 
 
+async def test_search_with_filters(client: Client) -> None:
+    tested = await call(client, "search_addons", query="kanji", has_tests=True)
+    assert [item["id"] for item in tested["items"]] == [KANJI]
+    recent = await call(client, "search_addons", query="kanji", updated_after="2026-09-21")
+    assert [item["id"] for item in recent["items"]] == [NEW_ADDON]
+    starred = await call(client, "search_addons", query="kanji", min_stars=10, anki_version_at_least="2.1.50")
+    assert [item["id"] for item in starred["items"]] == [KANJI]
+
+
 async def test_filter(client: Client) -> None:
     page = await call(client, "filter_addons", has_tests=True, sort_by="stars", limit=5)
     assert [item["id"] for item in page["items"]] == [OCCLUSION, KANJI]

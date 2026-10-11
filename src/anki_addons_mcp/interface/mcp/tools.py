@@ -41,6 +41,17 @@ Tags = Annotated[list[str] | None, Field(
                 "see list_tags for the vocabulary")]
 ExcludeTags = Annotated[list[str] | None, Field(
     description="AI tags the addon must not have, e.g. ['obsolete', 'no-description', 'paid']")]
+Language = Annotated[str | None, Field(description="GitHub language, e.g. Python, JavaScript")]
+DescriptionLanguage = Annotated[str | None, Field(description="ISO code of the description")]
+AnkiVersionKind = Annotated[VersionKind | None, Field(
+    description="Meaning of the addon's newest supported Anki version: hard (Anki disables it on newer "
+                "versions), tested (tested up to it, newer still run it), open (no limit), unknown")]
+AnkiVersionAtLeast = Annotated[str | None, Field(
+    description="The addon's newest supported or tested Anki version is at least this, e.g. 25.09")]
+HasAiDeclaration = Annotated[bool | None, Field(
+    description="Description mentions AI use (e.g. 'vibe-coded', 'claude')")]
+HasAiTooling = Annotated[bool | None, Field(
+    description="Repository has AI coding tool traces (e.g. AGENTS.md, .cursor)")]
 
 
 def register_tools(mcp: MCPServer, services: Services) -> None:
@@ -48,14 +59,31 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Full-text search over addon titles, AnkiWeb descriptions, AI summaries and tags, GitHub topics and "
-        "repo descriptions. Returns compact addon cards ranked by relevance."))
-    def search_addons(query: Annotated[str, Field(description="Search words, e.g. 'image occlusion'")],
-                      limit: Limit = 20, offset: Offset = 0,
-                      compatible_with_anki: AnkiVersion = None,
-                      tags: Tags = None, exclude_tags: ExcludeTags = None,
-                      snapshot: Snapshot = "latest") -> Page[AddonCard]:
+        "repo descriptions. Returns compact addon cards ranked by relevance. Accepts every filter of "
+        "filter_addons; filters are combined with the query with AND."))
+    def search_addons(  # NOSONAR - each filter is a flat tool parameter in the MCP input schema
+        query: Annotated[str, Field(description="Search words, e.g. 'image occlusion'")],
+        min_rating: int | None = None, min_likes: int | None = None, min_stars: int | None = None,
+        has_github: bool | None = None, has_tests: bool | None = None, has_forum: bool | None = None,
+        language: Language = None, description_language: DescriptionLanguage = None,
+        compatible_with_anki: AnkiVersion = None,
+        anki_version_kind: AnkiVersionKind = None, anki_version_at_least: AnkiVersionAtLeast = None,
+        updated_after: date | None = None, updated_before: date | None = None,
+        archived: bool | None = None,
+        has_ai_declaration: HasAiDeclaration = None, has_ai_tooling: HasAiTooling = None,
+        tags: Tags = None, exclude_tags: ExcludeTags = None,
+        limit: Limit = 20, offset: Offset = 0, snapshot: Snapshot = "latest",
+    ) -> Page[AddonCard]:
         with tool_errors():
-            filters = AddonFilters(compatible_with_anki=compatible_with_anki, tags=tags, exclude_tags=exclude_tags)
+            filters = AddonFilters(
+                min_rating=min_rating, min_likes=min_likes, min_stars=min_stars, has_github=has_github,
+                has_tests=has_tests, has_forum=has_forum, language=language,
+                description_language=description_language, compatible_with_anki=compatible_with_anki,
+                anki_version_kind=anki_version_kind, anki_version_at_least=anki_version_at_least,
+                updated_after=updated_after, updated_before=updated_before, archived=archived,
+                has_ai_declaration=has_ai_declaration, has_ai_tooling=has_ai_tooling, tags=tags,
+                exclude_tags=exclude_tags,
+            )
             return catalog.search(query, limit, offset, filters, parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description=(
@@ -65,20 +93,12 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
     def filter_addons(  # NOSONAR - each filter is a flat tool parameter in the MCP input schema
         min_rating: int | None = None, min_likes: int | None = None, min_stars: int | None = None,
         has_github: bool | None = None, has_tests: bool | None = None, has_forum: bool | None = None,
-        language: Annotated[str | None, Field(description="GitHub language, e.g. Python, JavaScript")] = None,
-        description_language: Annotated[str | None, Field(description="ISO code of the description")] = None,
+        language: Language = None, description_language: DescriptionLanguage = None,
         compatible_with_anki: AnkiVersion = None,
-        anki_version_kind: Annotated[VersionKind | None, Field(
-            description="Meaning of the addon's newest supported Anki version: hard (Anki disables it on newer "
-                        "versions), tested (tested up to it, newer still run it), open (no limit), unknown")] = None,
-        anki_version_at_least: Annotated[str | None, Field(
-            description="The addon's newest supported or tested Anki version is at least this, e.g. 25.09")] = None,
+        anki_version_kind: AnkiVersionKind = None, anki_version_at_least: AnkiVersionAtLeast = None,
         updated_after: date | None = None, updated_before: date | None = None,
         archived: bool | None = None,
-        has_ai_declaration: Annotated[bool | None, Field(
-            description="Description mentions AI use (e.g. 'vibe-coded', 'claude')")] = None,
-        has_ai_tooling: Annotated[bool | None, Field(
-            description="Repository has AI coding tool traces (e.g. AGENTS.md, .cursor)")] = None,
+        has_ai_declaration: HasAiDeclaration = None, has_ai_tooling: HasAiTooling = None,
         tags: Tags = None, exclude_tags: ExcludeTags = None,
         sort_by: SortField = SortField.RATING, descending: bool = True,
         limit: Limit = 20, offset: Offset = 0, snapshot: Snapshot = "latest",

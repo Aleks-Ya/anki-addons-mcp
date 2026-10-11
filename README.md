@@ -71,10 +71,10 @@ To host your own instance, see [Run over HTTP](README-DEV.md#run-over-http) and
 `check_compatibility`, `assess_maintenance`, `find_similar_addons`, `list_addons_by_author`,
 `get_addon_history`, `diff_snapshots`, `get_statistics`, `top_addons`, `list_snapshots`, `list_tags`, and
 `query_sql` (one sandboxed DuckDB `SELECT` over the `addons` and `tags` tables; only offered by SQL-capable
-backends). `search_addons` and `filter_addons` filter by AI tags with `tags` and `exclude_tags`.
-Compatibility follows Anki's parsed versions (point versions and the `hard`/`tested`/`open`/`unknown` kind of the
-upper version); `filter_addons` also filters by `anki_version_kind` and `anki_version_at_least` and sorts by
-`anki_version`.
+backends). `search_addons` accepts every filter of `filter_addons` (including AI tags with `tags` and
+`exclude_tags`) and combines them with the text query. Compatibility follows Anki's parsed versions (point versions
+and the `hard`/`tested`/`open`/`unknown` kind of the upper version); both tools filter by `anki_version_kind` and
+`anki_version_at_least`, and `filter_addons` also sorts by `anki_version`.
 
 **Resources**: `anki-addons://dataset/readme`, `anki-addons://dataset/schema`,
 `anki-addons://dataset/anki-versions`, `anki-addons://snapshots`,
