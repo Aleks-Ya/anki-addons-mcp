@@ -14,7 +14,7 @@ short_description: MCP server for the Anki Addons dataset
 
 An [MCP](https://modelcontextprotocol.io) server that gives LLM clients read-only access to the
 [Anki Addons dataset](https://huggingface.co/datasets/Ya-Alex/anki-addons): every addon in the AnkiWeb
-catalog, enriched with GitHub, Anki Forum and AI-summary data, published as monthly snapshots.
+catalog, enriched with GitHub, Anki Forum and AI-summary and AI-tag data, published as monthly snapshots.
 
 It answers questions such as "which addon does X?", "will it work on Anki 25.02?", "is it maintained?",
 and "what changed since last month?".
@@ -69,18 +69,19 @@ To host your own instance, see [Run over HTTP](README-DEV.md#run-over-http) and
 **Tools** (all read-only, every data tool takes an optional `snapshot`, `YYYY-MM-DD` or `latest`):
 `search_addons`, `filter_addons`, `get_addon`, `get_addon_readme`, `get_addon_description`,
 `check_compatibility`, `assess_maintenance`, `find_similar_addons`, `list_addons_by_author`,
-`get_addon_history`, `diff_snapshots`, `get_statistics`, `top_addons`, `list_snapshots`, and
-`query_sql` (one sandboxed DuckDB `SELECT` over an `addons` table; only offered by SQL-capable backends).
+`get_addon_history`, `diff_snapshots`, `get_statistics`, `top_addons`, `list_snapshots`, `list_tags`, and
+`query_sql` (one sandboxed DuckDB `SELECT` over the `addons` and `tags` tables; only offered by SQL-capable
+backends). `search_addons` and `filter_addons` filter by AI tags with `tags` and `exclude_tags`.
 
 **Resources**: `anki-addons://dataset/readme`, `anki-addons://dataset/schema`, `anki-addons://snapshots`,
 `anki-addons://snapshots/{snapshot}/metadata`, `anki-addons://snapshots/{snapshot}/aggregation`,
 `anki-addons://addons/{addon_id}` (and `/readme`, `/description`, `/history`),
-`anki-addons://authors/{github_user}`.
+`anki-addons://authors/{github_user}`, `anki-addons://tags`, `anki-addons://tags/{tag}`.
 
 **Prompts**: `find_addon_for_task`, `compare_addons`, `addon_health_report`, `upgrade_readiness`,
-`monthly_ecosystem_digest`, `before_you_build`, `author_portfolio`.
+`monthly_ecosystem_digest`, `before_you_build`, `author_portfolio`, `best_in_category`, `category_landscape`.
 
-AI summaries in the dataset are LLM-generated; the server labels them as such.
+AI summaries and tags in the dataset are LLM-generated; the server labels them as such.
 
 ## Configuration
 

@@ -6,7 +6,7 @@ from typing import Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from anki_addons_mcp.domain.models import AddonDetails, SnapshotInfo
+from anki_addons_mcp.domain.models import AddonDetails, SnapshotInfo, Tag
 
 OLD = date(2026, 9, 1)
 LATEST = date(2026, 10, 1)
@@ -21,6 +21,23 @@ NEW_ADDON = 1007
 REMOVED = 1008
 SAME_AUTHOR = 1009
 
+TAGS = [
+    Tag(name="card-creation", group="function", description="Building notes from text"),
+    Tag(name="card-templates", group="function", description="Note types and templates"),
+    Tag(name="deck-management", group="function", description="Deck tree, subdecks, deck options"),
+    Tag(name="dictionary", group="function", description="Lookup, definitions, translation"),
+    Tag(name="image-occlusion", group="function", description="Image occlusion"),
+    Tag(name="progress-tracking", group="function", description="Progress bars, daily goals"),
+    Tag(name="quiz", group="function", description="Multiple choice, typing answers"),
+    Tag(name="scheduling", group="function", description="Intervals, ease, reschedule"),
+    Tag(name="statistics", group="function", description="Graphs, heatmaps, retention"),
+    Tag(name="timer", group="function", description="Pomodoro, session timers"),
+    Tag(name="beta", group="status", description="Self-declared alpha, beta or WIP"),
+    Tag(name="mobile-compatible", group="status", description="Works on AnkiDroid or AnkiMobile"),
+    Tag(name="obsolete", group="status", description="Built into Anki now, or no longer working"),
+    Tag(name="paid", group="status", description="Patreon-only, Pro tiers, subscriptions"),
+]
+
 
 def _manifest(min_point: int | None, max_point: int | None) -> dict[str, Any]:
     return {"package": "pkg", "name": "Pkg", "conflicts": ["other"], "min_point_version": min_point,
@@ -32,7 +49,7 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
           branches: list[tuple[str | None, str | None]] | None = None, description: str = "",
           ai_declaration: list[str] | None = None, lang: str | None = "en",
           github: dict[str, Any] | None = None, forum: dict[str, Any] | None = None,
-          ai_summary: str | None = None) -> dict[str, Any]:
+          ai_summary: str | None = None, ai_tags: list[str] | None = None) -> dict[str, Any]:
     return {
         "id": addon_id,
         "anki_web": {
@@ -55,7 +72,7 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
         },
         "github": github,
         "forum": forum,
-        "ai": {"summary": ai_summary, "model": "test-model"} if ai_summary else None,
+        "ai": {"summary": ai_summary, "model": "test-model", "tags": ai_tags or []} if ai_summary or ai_tags else None,
     }
 
 
@@ -89,13 +106,14 @@ def latest_records() -> list[dict[str, Any]]:
               anki_version="25.02~", branches=[("2.1.0", "2.1.49"), ("25.02", "+")],
               description="Look up kanji stroke order and readings while reviewing japanese vocabulary.",
               ai_summary="Shows kanji stroke order and readings during review.",
+              ai_tags=["dictionary", "card-templates", "mobile-compatible"],
               github=github("alice", "kanji-helper", stars=50, tests=12, actions=2, topics=["japanese", "kanji"],
                             manifest=_manifest(231000, None), readme="# Kanji Helper\nStroke order for kanji."),
               forum=forum(11, 30)),
         addon(OCCLUSION, "Image Occlusion Plus", rating=300, likes=310, dislikes=10, update_date="2026-08-01",
               anki_version="2.1.66~", branches=[("2.1.66", "25.09+")],
               description="Hide parts of an image to create occlusion cards for anatomy.",
-              ai_summary="Creates image occlusion cards.",
+              ai_summary="Creates image occlusion cards.", ai_tags=["image-occlusion", "card-creation"],
               github=github("bob", "image-occlusion", stars=500, tests=40, actions=3, license="GPL-3.0",
                             languages=["Python", "JavaScript"], topics=["image", "occlusion"],
                             manifest=_manifest(66, -250900), readme="# Image Occlusion\nOcclude images."),
@@ -103,22 +121,25 @@ def latest_records() -> list[dict[str, Any]]:
         addon(HEATMAP, "Review Heatmap", rating=80, likes=82, dislikes=2, update_date="2024-01-10",
               anki_version="2.1.20~", branches=[("2.1.20", "2.1.54")],
               description="Heatmap of review history with streak counter.",
+              ai_tags=["statistics", "progress-tracking"],
               github=github("carol", "review-heatmap", stars=200, last_commit="2023-12-01T00:00:00",
                             tests=None, license="AGPL-3.0", topics=["heatmap"])),
         addon(LEGACY, "Legacy Scheduler", rating=5, likes=6, dislikes=1, update_date="2019-05-01",
               anki_version="2.1.0~", branches=[("2.1.0", None)], description="Old scheduler tweaks.",
+              ai_tags=["scheduling", "obsolete"],
               github=github("dave", "legacy", stars=3, last_commit="2019-04-01T00:00:00", archived=True,
                             license=None)),
         addon(NO_GITHUB, "Simple Timer", rating=15, likes=15, update_date="2025-11-11", anki_version="",
-              branches=[("2.1.50", "+")], description="A timer for review sessions. Zeitmesser.", lang="de"),
+              branches=[("2.1.50", "+")], description="A timer for review sessions. Zeitmesser.", lang="de",
+              ai_tags=["timer"]),
         addon(VIBE, "Vibe Deck Tools", rating=2, likes=3, dislikes=1, update_date="2026-09-29",
               anki_version="25.09~", branches=[("25.09", "+")], description="Deck tools vibe-coded with claude.",
-              ai_declaration=["claude", "vibe-coded"],
+              ai_declaration=["claude", "vibe-coded"], ai_tags=["deck-management", "beta"],
               github=github("erin", "vibe-deck", stars=1, last_commit="2026-09-28T12:00:00", license="MIT",
                             ai_tooling=["claude-code", "agents-md"], topics=["deck"])),
         addon(NEW_ADDON, "Kanji Quiz", rating=10, likes=10, update_date="2026-09-25", anki_version="25.02~",
               branches=[("25.02", "+")], description="Quiz yourself on kanji meanings.",
-              ai_summary="Kanji meaning quiz.",
+              ai_summary="Kanji meaning quiz.", ai_tags=["quiz", "dictionary"],
               github=github("frank", "kanji-quiz", stars=5, topics=["kanji", "quiz"])),
         addon(SAME_AUTHOR, "Alice Utilities", rating=40, likes=41, dislikes=1, update_date="2026-05-05",
               anki_version="23.10~", branches=[("23.10", "+")], description="Assorted utilities.",
@@ -151,6 +172,7 @@ def _metadata(snapshot: date) -> dict[str, str]:
 def _write_snapshot(folder: Path, records: list[dict[str, Any]], snapshot: date) -> None:
     (folder / "parquet").mkdir(parents=True, exist_ok=True)
     pq.write_table(pa.Table.from_pylist(records), folder / "parquet" / "data.parquet", compression="zstd")
+    pq.write_table(pa.Table.from_pylist([t.model_dump() for t in TAGS]), folder / "parquet" / "tags.parquet")
     (folder / "metadata.json").write_text(json.dumps(_metadata(snapshot)))
 
 
@@ -178,3 +200,7 @@ def domain_snapshots() -> dict[date, list[AddonDetails]]:
 
 def domain_infos() -> dict[date, SnapshotInfo]:
     return {d: SnapshotInfo.model_validate({**_metadata(d), "date": d, "latest": d == LATEST}) for d in (OLD, LATEST)}
+
+
+def domain_tags() -> dict[date, list[Tag]]:
+    return {OLD: list(TAGS), LATEST: list(TAGS)}

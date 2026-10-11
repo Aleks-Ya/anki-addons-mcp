@@ -10,14 +10,16 @@ from anki_addons_mcp.interface.mcp.tools import register_tools
 
 INSTRUCTIONS = """\
 Read-only access to the Anki Addons dataset: every addon in the AnkiWeb catalog, enriched with GitHub,
-Anki Forum and AI-summary data, published as monthly snapshots.
+Anki Forum and AI-summary and AI-tag data, published as monthly snapshots.
 - Start with search_addons (free text) or filter_addons (structured); both return compact addon cards.
 - Use get_addon for one full record and get_addon_readme/get_addon_description for long texts.
 - check_compatibility, assess_maintenance and find_similar_addons answer "will it work / is it maintained /
   what else is there".
+- Addons carry AI tags from a fixed vocabulary (list_tags): function tags (what an addon does) and status
+  tags (obsolete, paid, beta, ...). Filter with tags/exclude_tags in search_addons and filter_addons.
 - Every data tool takes an optional snapshot (YYYY-MM-DD from list_snapshots, default latest);
   get_addon_history and diff_snapshots compare snapshots.
-- ai_summary fields are LLM-generated and may be inaccurate.
+- ai_summary and ai_tags fields are LLM-generated and may be inaccurate.
 """
 
 

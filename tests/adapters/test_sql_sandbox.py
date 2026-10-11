@@ -26,6 +26,16 @@ def test_snapshot_and_complex_values(duckdb_repository: DuckDbAddonRepository) -
     assert isinstance(result.rows[0][1], list)
 
 
+def test_tags_table(duckdb_repository: DuckDbAddonRepository) -> None:
+    assert "Table `tags`" in duckdb_repository.sql_schema()
+    result = duckdb_repository.execute_readonly(
+        'SELECT t."group", count(*) AS n FROM (SELECT unnest(ai_tags) AS tag FROM addons) a '
+        'JOIN tags t ON t.name = a.tag GROUP BY 1 ORDER BY 1', None, 10, 5)
+    assert result.rows == [["function", 11], ["status", 3]]
+    helpers = duckdb_repository.execute_readonly("SELECT * FROM addons LIMIT 1", OLD, 10, 5)
+    assert "tags_text" not in helpers.columns and "ai_tags" in helpers.columns
+
+
 def test_row_cap(duckdb_repository: DuckDbAddonRepository) -> None:
     result = duckdb_repository.execute_readonly("SELECT id FROM addons", None, 3, 5)
     assert result.row_count == 3 and result.truncated

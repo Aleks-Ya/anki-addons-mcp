@@ -14,6 +14,7 @@ from anki_addons_mcp.domain.models import (
     GroupField,
     Page,
     SnapshotInfo,
+    Tag,
     TextKind,
 )
 from anki_addons_mcp.domain.ports import AddonRepository
@@ -68,6 +69,12 @@ def _matches(d: AddonDetails, f: AddonFilters) -> bool:
         checks.append(bool(gh and gh.ai_tooling_markers) == f.has_ai_tooling)
     if f.compatible_with_anki is not None:
         checks.append(is_compatible(aw.branches, f.compatible_with_anki))
+    if f.tags or f.exclude_tags:
+        tags = {t.lower() for t in d.ai.tags} if d.ai else set()
+        if f.tags:
+            checks.append({t.lower() for t in f.tags} <= tags)
+        if f.exclude_tags:
+            checks.append(not ({t.lower() for t in f.exclude_tags} & tags))
     return all(checks)
 
 
@@ -76,6 +83,7 @@ def _score(d: AddonDetails, terms: list[str]) -> float:
     body = Counter(_WORD.findall(" ".join(filter(None, [
         d.description,
         d.ai.summary if d.ai else None,
+        " ".join(d.ai.tags) if d.ai else None,
         " ".join(d.github.topics) if d.github else None,
         d.github.repo_description if d.github else None,
     ])).lower()))
@@ -121,17 +129,20 @@ def _group_values(d: AddonDetails, field: GroupField) -> list[str | None]:
             return list(aw.ai_declaration_markers) or [None]
         case GroupField.AI_TOOLING_MARKER:
             return list(gh.ai_tooling_markers) if gh and gh.ai_tooling_markers else [None]
+        case GroupField.AI_TAG:
+            return list(d.ai.tags) if d.ai and d.ai.tags else [None]
 
 
 class InMemoryAddonRepository(AddonRepository):
     def __init__(self, snapshots: dict[date, list[AddonDetails]], infos: dict[date, SnapshotInfo] | None = None,
-                 documentation: str = "In-memory Anki addons dataset."):
+                 documentation: str = "In-memory Anki addons dataset.", tags: dict[date, list[Tag]] | None = None):
         if not snapshots:
             raise ValueError("At least one snapshot is required")
         self._snapshots = {d: {a.id: a for a in addons} for d, addons in snapshots.items()}
         self._latest = max(snapshots)
         self._infos = infos or {}
         self._documentation = documentation
+        self._tags = tags or {}
 
     def _data(self, snapshot: date | None) -> dict[int, AddonDetails]:
         key = snapshot or self._latest
@@ -212,6 +223,11 @@ class InMemoryAddonRepository(AddonRepository):
             for value in _group_values(details, field):
                 counter[value or NONE_GROUP] += 1
         return dict(counter)
+
+    def list_tags(self, snapshot: date | None = None) -> list[Tag]:
+        key = snapshot or self._latest
+        self._data(key)
+        return sorted(self._tags.get(key, []), key=lambda t: (t.group, t.name))
 
     def get_documentation(self) -> str:
         return self._documentation

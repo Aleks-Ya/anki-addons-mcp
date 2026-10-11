@@ -11,12 +11,14 @@ from anki_addons_mcp.adapters.hf_parquet.mapping import CARD_COLUMNS, row_to_car
 from anki_addons_mcp.adapters.hf_parquet.source import DatasetSource
 from anki_addons_mcp.adapters.hf_parquet.sql import (
     FLAT_COLUMNS,
+    HELPER_COLUMNS,
     SEARCH_COLUMNS,
     SQL_VIEW,
-    TOPICS_TEXT,
+    TAGS_VIEW,
     flat_select,
     json_safe,
     schema_description,
+    tags_select,
     validate_readonly_select,
 )
 from anki_addons_mcp.domain.compatibility import is_compatible
@@ -32,6 +34,7 @@ from anki_addons_mcp.domain.models import (
     Page,
     SnapshotInfo,
     SqlResult,
+    Tag,
     TextKind,
 )
 from anki_addons_mcp.domain.ports import AddonRepository
@@ -65,7 +68,14 @@ _LIST_GROUPS = {
     GroupField.GITHUB_TOPIC: "github_topics",
     GroupField.AI_DECLARATION_MARKER: "ai_declaration_markers",
     GroupField.AI_TOOLING_MARKER: "github_ai_tooling_markers",
+    GroupField.AI_TAG: "ai_tags",
 }
+
+_LOWER_TAGS = "list_transform(ai_tags, lambda x: lower(x))"
+
+
+def _lower_all(values: list[str]) -> list[str]:
+    return [v.lower() for v in values]
 
 
 def _filters_sql(f: AddonFilters) -> tuple[list[str], list[Any]]:
@@ -111,6 +121,10 @@ def _filters_sql(f: AddonFilters) -> tuple[list[str], list[Any]]:
         add("(coalesce(len(ai_declaration_markers), 0) > 0) = ?", f.has_ai_declaration)
     if f.has_ai_tooling is not None:
         add("(coalesce(len(github_ai_tooling_markers), 0) > 0) = ?", f.has_ai_tooling)
+    if f.tags:
+        add(f"list_has_all({_LOWER_TAGS}, ?)", _lower_all(f.tags))
+    if f.exclude_tags:
+        add(f"NOT list_has_any(coalesce({_LOWER_TAGS}, []), ?)", _lower_all(f.exclude_tags))
     return [f"coalesce({c}, false)" for c in clauses], params
 
 
@@ -124,6 +138,7 @@ class _State:
         self.source = source
         self.con = duckdb.connect(":memory:")
         self.relations: dict[date, str] = {}
+        self.tag_tables: dict[date, str] = {}
         self.fts: set[str] = set()
         self.lock = threading.RLock()
         self.fts_available = self._load_fts()
@@ -161,6 +176,21 @@ class _State:
             self.relations[resolved] = name
             log.info("Loaded snapshot %s as %s", resolved, name)
             return name
+
+    def tag_table(self, snapshot: date | None) -> str:
+        resolved = snapshot or self.source.latest_date()
+        with self.lock:
+            if resolved in self.tag_tables:
+                return self.tag_tables[resolved]
+        if resolved not in self.source.snapshot_dates():
+            raise SnapshotNotFound(resolved)
+        path = str(self.source.tags_file(resolved))
+        with self.lock:
+            if resolved not in self.tag_tables:
+                name = f"tags_{resolved.strftime('%Y%m%d')}"
+                self.con.execute(f"CREATE TABLE {name} AS {tags_select(path)}")
+                self.tag_tables[resolved] = name
+            return self.tag_tables[resolved]
 
     def _index(self, table: str) -> None:
         if not self.fts_available:
@@ -320,6 +350,16 @@ class DuckDbAddonRepository(AddonRepository):
                    f"ELSE ['{NONE_GROUP}'] END) AS k FROM {{rel}}) GROUP BY k")
         return {row["k"]: int(row["n"]) for row in self._select(sql, [], snapshot)}
 
+    def list_tags(self, snapshot: date | None = None) -> list[Tag]:
+        state = self._current()
+        table = state.tag_table(snapshot)
+        cursor = state.cursor()
+        try:
+            cursor.execute(f'SELECT name, "group", description FROM {table} ORDER BY "group", name')
+            return [Tag.model_validate(row) for row in _dicts(cursor)]
+        finally:
+            cursor.close()
+
     def get_documentation(self) -> str:
         return self._current().source.readme() or "Anki addons dataset (no dataset card available)."
 
@@ -329,11 +369,14 @@ class DuckDbAddonRepository(AddonRepository):
     def execute_readonly(self, sql: str, snapshot: date | None, max_rows: int, timeout_seconds: float) -> SqlResult:
         state = self._current()
         relation = state.relation(snapshot)
+        tag_table = state.tag_table(snapshot)
         cursor = state.cursor()
         timer = threading.Timer(timeout_seconds, cursor.interrupt)
         try:
-            validate_readonly_select(cursor, sql, {SQL_VIEW})
-            cursor.execute(f"CREATE OR REPLACE TEMP VIEW {SQL_VIEW} AS SELECT * EXCLUDE ({TOPICS_TEXT}) FROM {relation}")
+            validate_readonly_select(cursor, sql, {SQL_VIEW, TAGS_VIEW})
+            helpers = ", ".join(HELPER_COLUMNS)
+            cursor.execute(f"CREATE OR REPLACE TEMP VIEW {SQL_VIEW} AS SELECT * EXCLUDE ({helpers}) FROM {relation}")
+            cursor.execute(f"CREATE OR REPLACE TEMP VIEW {TAGS_VIEW} AS SELECT * FROM {tag_table}")
             timer.start()
             try:
                 cursor.execute(sql)

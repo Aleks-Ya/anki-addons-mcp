@@ -199,3 +199,45 @@ def test_adapters_return_identical_records(memory_repository: InMemoryAddonRepos
     assert duckdb_repository.get_addons(all_ids, snapshot) == memory_repository.get_addons(all_ids, snapshot)
     duck_cards = duckdb_repository.find(AddonQuery(limit=None), snapshot).items
     assert duck_cards == memory_repository.find(AddonQuery(limit=None), snapshot).items
+
+
+def test_list_tags(repository: AddonRepository) -> None:
+    tags = repository.list_tags()
+    assert [t.name for t in tags][:2] == ["card-creation", "card-templates"]
+    assert {t.group for t in tags} == {"function", "status"}
+    assert [t.name for t in repository.list_tags(OLD)] == [t.name for t in tags]
+    with pytest.raises(SnapshotNotFound):
+        repository.list_tags(date(2000, 1, 1))
+
+
+def test_ai_tags_on_cards_and_details(repository: AddonRepository) -> None:
+    details = repository.get_addon(HEATMAP)
+    assert details is not None and details.ai is not None
+    assert details.ai.summary is None and details.ai.tags == ["statistics", "progress-tracking"]
+    card = repository.find(AddonQuery(filters=AddonFilters(addon_ids=[KANJI]))).items[0]
+    assert card.ai_tags == ["dictionary", "card-templates", "mobile-compatible"]
+    no_tags = repository.get_addon(SAME_AUTHOR)
+    assert no_tags is not None and no_tags.ai is None
+
+
+def test_filter_by_tags(repository: AddonRepository) -> None:
+    assert set(ids(repository, AddonQuery(filters=AddonFilters(tags=["dictionary"])))) == {KANJI, NEW_ADDON}
+    assert ids(repository, AddonQuery(filters=AddonFilters(tags=["Dictionary", "QUIZ"]))) == [NEW_ADDON]
+    assert ids(repository, AddonQuery(filters=AddonFilters(tags=["dictionary", "statistics"]))) == []
+
+
+def test_exclude_tags(repository: AddonRepository) -> None:
+    found = set(ids(repository, AddonQuery(filters=AddonFilters(exclude_tags=["obsolete", "beta"]), limit=None)))
+    assert found == {KANJI, OCCLUSION, HEATMAP, NO_GITHUB, NEW_ADDON, SAME_AUTHOR}
+
+
+def test_group_counts_by_ai_tag(repository: AddonRepository) -> None:
+    counts = repository.group_counts(GroupField.AI_TAG)
+    assert counts["dictionary"] == 2
+    assert counts["statistics"] == 1
+    assert counts[NONE_GROUP] == 1
+    assert "paid" not in counts
+
+
+def test_search_matches_tags(repository: AddonRepository) -> None:
+    assert ids(repository, AddonQuery(text="statistics")) == [HEATMAP]

@@ -4,6 +4,7 @@ from datetime import date
 from pydantic import BaseModel
 
 from anki_addons_mcp.application.catalog import CatalogService, check_limit
+from anki_addons_mcp.application.tags import TagService
 from anki_addons_mcp.domain.models import AddonCard, AddonDetails
 from anki_addons_mcp.domain.ports import AddonRepository
 from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, SortField
@@ -33,9 +34,10 @@ def _terms(details: AddonDetails) -> list[str]:
 
 
 class SimilarityService:
-    def __init__(self, repository: AddonRepository, catalog: CatalogService):
+    def __init__(self, repository: AddonRepository, catalog: CatalogService, tags: TagService):
         self._repository = repository
         self._catalog = catalog
+        self._tags = tags
 
     def similar(self, addon_id: int, limit: int = 10, snapshot: date | None = None) -> list[SimilarAddon]:
         check_limit(limit)
@@ -60,6 +62,7 @@ class SimilarityService:
                 entry.score += 0.5
                 entry.reasons.append(f"same author ({author})")
         self._add_topic_overlap(target, scored, snapshot)
+        self._add_tag_overlap(target, scored, snapshot)
         ranked = sorted(scored.values(), key=lambda s: (-s.score, s.card.id))[:limit]
         for entry in ranked:
             entry.score = round(entry.score, 3)
@@ -74,3 +77,13 @@ class SimilarityService:
             if shared:
                 scored[details.id].score += 0.25 * len(shared)
                 scored[details.id].reasons.append("shared GitHub topics: " + ", ".join(sorted(shared)))
+
+    def _add_tag_overlap(self, target: AddonDetails, scored: dict[int, SimilarAddon], snapshot: date | None) -> None:
+        tags = set(target.ai.tags) & self._tags.function_tags(snapshot) if target.ai else set()
+        if not tags or not scored:
+            return
+        for details in self._repository.get_addons(list(scored), snapshot):
+            shared = tags & set(details.ai.tags if details.ai else [])
+            if shared:
+                scored[details.id].score += 0.25 * len(shared)
+                scored[details.id].reasons.append("shared tags: " + ", ".join(sorted(shared)))

@@ -7,6 +7,7 @@ from anki_addons_mcp.application.maintenance import MaintenanceService, Maintena
 from anki_addons_mcp.application.similarity import SimilarityService
 from anki_addons_mcp.application.snapshots import SnapshotService
 from anki_addons_mcp.application.stats import StatsService
+from anki_addons_mcp.application.tags import TagService
 from anki_addons_mcp.domain.ports import AddonRepository, SqlQueryable
 
 
@@ -26,6 +27,7 @@ class Services:
     history: HistoryService
     similarity: SimilarityService
     stats: StatsService
+    tags: TagService
     sql: SqlQueryable | None
     sql_limits: SqlLimits
 
@@ -33,7 +35,8 @@ class Services:
 def build_services(repository: AddonRepository, thresholds: MaintenanceThresholds | None = None,
                    sql_enabled: bool = True, sql_limits: SqlLimits | None = None) -> Services:
     snapshots = SnapshotService(repository)
-    catalog = CatalogService(repository)
+    tags = TagService(repository)
+    catalog = CatalogService(repository, tags)
     sql = repository if sql_enabled and isinstance(repository, SqlQueryable) else None
     return Services(
         repository=repository,
@@ -42,8 +45,9 @@ def build_services(repository: AddonRepository, thresholds: MaintenanceThreshold
         compatibility=CompatibilityService(catalog),
         maintenance=MaintenanceService(catalog, snapshots, thresholds or MaintenanceThresholds()),
         history=HistoryService(repository, snapshots),
-        similarity=SimilarityService(repository, catalog),
+        similarity=SimilarityService(repository, catalog, tags),
         stats=StatsService(repository, snapshots),
+        tags=tags,
         sql=sql,
         sql_limits=sql_limits or SqlLimits(),
     )

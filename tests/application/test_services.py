@@ -161,3 +161,31 @@ def test_statistics(services: Services) -> None:
 
 def test_sql_disabled_for_memory(services: Services) -> None:
     assert services.sql is None
+
+
+def test_tag_vocabulary(services: Services) -> None:
+    vocabulary = services.tags.vocabulary()
+    assert vocabulary[0].name == "dictionary" and vocabulary[0].addon_count == 2
+    assert [t.group for t in vocabulary].index("status") == 10
+    assert next(t for t in vocabulary if t.name == "paid").addon_count == 0
+
+
+def test_unknown_tag_is_rejected(services: Services) -> None:
+    with pytest.raises(InvalidQuery, match="Unknown tag 'stats'"):
+        services.catalog.filter(AddonFilters(tags=["stats"]))
+    with pytest.raises(InvalidQuery, match="Unknown tag 'free'"):
+        services.catalog.search("kanji", filters=AddonFilters(exclude_tags=["free"]))
+    with pytest.raises(InvalidQuery):
+        services.catalog.by_tag("nope")
+
+
+def test_top_and_by_tag(services: Services) -> None:
+    assert [c.id for c in services.catalog.top(TopMetric.RATING, 5, tag="dictionary").items] == [KANJI, NEW_ADDON]
+    assert services.catalog.by_tag("timer").items[0].id == NO_GITHUB
+
+
+def test_similar_reports_shared_tags(services: Services) -> None:
+    similar = services.similarity.similar(KANJI, 5)
+    quiz = next(s for s in similar if s.card.id == NEW_ADDON)
+    assert "shared tags: dictionary" in quiz.reasons
+    assert not any("mobile-compatible" in reason for s in similar for reason in s.reasons)

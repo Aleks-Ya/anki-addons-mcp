@@ -6,11 +6,13 @@ from pydantic import BaseModel, TypeAdapter
 
 from anki_addons_mcp.application.services import Services
 from anki_addons_mcp.application.snapshots import parse_snapshot
+from anki_addons_mcp.application.tags import TagUsage
 from anki_addons_mcp.domain.models import AddonDetails, SnapshotInfo, TextKind
 from anki_addons_mcp.interface.mcp.errors import parse_addon_id, resource_errors
 
 JSON = "application/json"
 _SNAPSHOTS = TypeAdapter(list[SnapshotInfo])
+_TAGS = TypeAdapter(list[TagUsage])
 
 
 def _json(model: BaseModel) -> str:
@@ -82,3 +84,15 @@ def register_resources(mcp: MCPServer, services: Services) -> None:
     def author(github_user: str) -> str:
         with resource_errors():
             return _json(catalog.by_author(github_user))
+
+    @mcp.resource("anki-addons://tags", mime_type=JSON,
+                  description="AI tag vocabulary with descriptions and addon counts (latest snapshot)")
+    def tags() -> str:
+        with resource_errors():
+            return _TAGS.dump_json(services.tags.vocabulary(), indent=2).decode()
+
+    @mcp.resource("anki-addons://tags/{tag}", mime_type=JSON,
+                  description="Addons with an AI tag in the latest snapshot")
+    def tag_addons(tag: str) -> str:
+        with resource_errors():
+            return _json(catalog.by_tag(tag))

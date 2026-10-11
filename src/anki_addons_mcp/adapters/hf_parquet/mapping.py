@@ -17,7 +17,7 @@ from anki_addons_mcp.domain.models import (
 CARD_COLUMNS = [
     "id", "title", "url", "rating", "likes", "dislikes", "update_date", "anki_version", "ai_summary",
     "github_user", "github_repo", "github_stars", "github_last_commit", "github_archived", "github_license",
-    "forum_posts_count",
+    "forum_posts_count", "ai_tags",
 ]
 
 
@@ -46,7 +46,8 @@ def row_to_card(row: dict[str, Any], score: float | None = None) -> AddonCard:
         anki_version=row["anki_version"] or None, ai_summary=row["ai_summary"],
         github_user=row["github_user"], github_repo=row["github_repo"], github_stars=row["github_stars"],
         github_last_commit=row["github_last_commit"], github_archived=row["github_archived"],
-        license=row["github_license"], forum_posts_count=row["forum_posts_count"], score=score,
+        license=row["github_license"], forum_posts_count=row["forum_posts_count"], ai_tags=_list(row["ai_tags"]),
+        score=score,
     )
 
 
@@ -102,5 +103,7 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
             last_posted_at=row["forum_last_posted_at"],
             posts_count=row["forum_posts_count"],
         )
-    ai = AiInfo(summary=row["ai_summary"], model=row["ai_model"]) if row["ai_summary"] or row["ai_model"] else None
+    tags = _list(row["ai_tags"])
+    has_ai = row["ai_summary"] or row["ai_model"] or tags
+    ai = AiInfo(summary=row["ai_summary"], model=row["ai_model"], tags=tags) if has_ai else None
     return AddonDetails(id=row["id"], anki_web=anki_web, github=github, forum=forum, ai=ai)

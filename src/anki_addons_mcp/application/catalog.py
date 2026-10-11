@@ -3,6 +3,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel
 
+from anki_addons_mcp.application.tags import TagService
 from anki_addons_mcp.domain.errors import AddonNotFound, InvalidQuery
 from anki_addons_mcp.domain.models import AddonCard, AddonDetails, Page, TextKind
 from anki_addons_mcp.domain.ports import AddonRepository
@@ -49,8 +50,9 @@ def check_limit(limit: int) -> int:
 
 
 class CatalogService:
-    def __init__(self, repository: AddonRepository):
+    def __init__(self, repository: AddonRepository, tags: TagService):
         self._repository = repository
+        self._tags = tags
 
     def search(
         self, text: str, limit: int = 20, offset: int = 0, filters: AddonFilters | None = None,
@@ -58,7 +60,9 @@ class CatalogService:
     ) -> Page[AddonCard]:
         if not text.strip():
             raise InvalidQuery("query must not be empty")
-        query = AddonQuery(text=text, filters=filters or AddonFilters(), sort=SortField.RELEVANCE,
+        filters = filters or AddonFilters()
+        self._tags.validate_filters(filters, snapshot)
+        query = AddonQuery(text=text, filters=filters, sort=SortField.RELEVANCE,
                            offset=offset, limit=check_limit(limit))
         return self._repository.find(query, snapshot)
 
@@ -66,19 +70,28 @@ class CatalogService:
         self, filters: AddonFilters, sort: SortField = SortField.RATING, descending: bool = True,
         limit: int = 20, offset: int = 0, snapshot: date | None = None,
     ) -> Page[AddonCard]:
+        self._tags.validate_filters(filters, snapshot)
         query = AddonQuery(filters=filters, sort=sort, descending=descending, offset=offset,
                            limit=check_limit(limit))
         return self._repository.find(query, snapshot)
 
-    def top(self, metric: TopMetric, limit: int = 10, snapshot: date | None = None) -> Page[AddonCard]:
+    def top(self, metric: TopMetric, limit: int = 10, snapshot: date | None = None,
+            tag: str | None = None) -> Page[AddonCard]:
         filters = AddonFilters(has_github=True) if metric == TopMetric.STARS else AddonFilters()
         if metric == TopMetric.FORUM_POSTS:
             filters = AddonFilters(has_forum=True)
+        if tag:
+            filters.tags = [tag]
         return self.filter(filters, _TOP_SORT[metric], True, limit, 0, snapshot)
 
     def by_author(self, github_user: str, snapshot: date | None = None) -> Page[AddonCard]:
         query = AddonQuery(filters=AddonFilters(github_user=github_user), sort=SortField.RATING, limit=None)
         return self._repository.find(query, snapshot)
+
+    def by_tag(self, tag: str, snapshot: date | None = None) -> Page[AddonCard]:
+        filters = AddonFilters(tags=[tag])
+        self._tags.validate_filters(filters, snapshot)
+        return self._repository.find(AddonQuery(filters=filters, sort=SortField.RATING, limit=None), snapshot)
 
     def get(
         self, addon_id: int, snapshot: date | None = None, include_description: bool = False,

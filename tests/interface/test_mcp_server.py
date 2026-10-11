@@ -15,11 +15,12 @@ pytestmark = pytest.mark.anyio
 EXPECTED_TOOLS = {
     "search_addons", "filter_addons", "get_addon", "get_addon_readme", "get_addon_description",
     "check_compatibility", "assess_maintenance", "find_similar_addons", "list_addons_by_author",
-    "get_addon_history", "diff_snapshots", "get_statistics", "top_addons", "list_snapshots",
+    "get_addon_history", "diff_snapshots", "get_statistics", "top_addons", "list_snapshots", "list_tags",
 }
 EXPECTED_PROMPTS = {
     "find_addon_for_task", "compare_addons", "addon_health_report", "upgrade_readiness",
-    "monthly_ecosystem_digest", "before_you_build", "author_portfolio",
+    "monthly_ecosystem_digest", "before_you_build", "author_portfolio", "best_in_category",
+    "category_landscape",
 }
 
 
@@ -48,10 +49,12 @@ async def test_lists_tools_with_read_only_annotations(client: Client, repository
 async def test_lists_prompts_and_resources(client: Client) -> None:
     assert {p.name for p in (await client.list_prompts()).prompts} == EXPECTED_PROMPTS
     assert {str(r.uri) for r in (await client.list_resources()).resources} == {
-        "anki-addons://dataset/readme", "anki-addons://dataset/schema", "anki-addons://snapshots"}
+        "anki-addons://dataset/readme", "anki-addons://dataset/schema", "anki-addons://snapshots",
+        "anki-addons://tags"}
     templates = {t.uri_template for t in (await client.list_resource_templates()).resource_templates}
     assert "anki-addons://addons/{addon_id}" in templates
-    assert len(templates) == 7
+    assert "anki-addons://tags/{tag}" in templates
+    assert len(templates) == 8
 
 
 async def test_search(client: Client) -> None:
@@ -68,6 +71,23 @@ async def test_filter(client: Client) -> None:
 async def test_filter_by_date(client: Client) -> None:
     page = await call(client, "filter_addons", updated_after="2026-09-21", limit=5)
     assert page["total"] == 2
+
+
+async def test_tags(client: Client) -> None:
+    tags = await call(client, "list_tags")
+    assert tags["result"][0] == {"name": "dictionary", "group": "function",
+                                 "description": "Lookup, definitions, translation", "addon_count": 2}
+    page = await call(client, "filter_addons", tags=["dictionary"], exclude_tags=["mobile-compatible"])
+    assert [item["id"] for item in page["items"]] == [NEW_ADDON]
+    assert page["items"][0]["ai_tags"] == ["quiz", "dictionary"]
+    found = await call(client, "search_addons", query="kanji", tags=["quiz"])
+    assert [item["id"] for item in found["items"]] == [NEW_ADDON]
+    top = await call(client, "top_addons", tag="dictionary", limit=1)
+    assert top["items"][0]["id"] == KANJI
+    stats = await call(client, "get_statistics", group_by=["ai_tag"])
+    assert stats["groups"][0]["counts"]["dictionary"] == 2
+    unknown = await client.call_tool("filter_addons", {"tags": ["stats"]})
+    assert unknown.is_error and "list_tags" in unknown.content[0].text
 
 
 async def test_get_addon_include(client: Client) -> None:
@@ -151,6 +171,10 @@ async def test_resources(client: Client) -> None:
     assert "Test dataset card" in card
     author = json.loads((await client.read_resource("anki-addons://authors/alice")).contents[0].text)
     assert author["total"] == 2
+    tags = json.loads((await client.read_resource("anki-addons://tags")).contents[0].text)
+    assert len(tags) == 14
+    tagged = json.loads((await client.read_resource("anki-addons://tags/dictionary")).contents[0].text)
+    assert [item["id"] for item in tagged["items"]] == [KANJI, NEW_ADDON]
 
 
 async def test_missing_resource_is_error(client: Client) -> None:

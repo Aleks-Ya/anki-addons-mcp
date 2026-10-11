@@ -13,6 +13,7 @@ from anki_addons_mcp.application.services import Services
 from anki_addons_mcp.application.similarity import SimilarAddon
 from anki_addons_mcp.application.snapshots import parse_snapshot
 from anki_addons_mcp.application.stats import Statistics
+from anki_addons_mcp.application.tags import TagUsage
 from anki_addons_mcp.domain.models import AddonCard, AddonDetails, GroupField, Page, SnapshotInfo, SqlResult, TextKind
 from anki_addons_mcp.domain.query import AddonFilters, SortField
 from anki_addons_mcp.interface.mcp.errors import tool_errors
@@ -26,20 +27,26 @@ Offset = Annotated[int, Field(ge=0, description="Number of results to skip, for 
 AnkiVersion = Annotated[str | None, Field(description="Anki version such as 25.02 or 2.1.66")]
 MaxChars = Annotated[int, Field(ge=100, le=200_000, description="Truncate the text to this many characters")]
 AddonInclude = Literal["description", "readme", "links"]
+Tags = Annotated[list[str] | None, Field(
+    description="AI tags the addon must all have, e.g. ['statistics'] or ['cloze', 'mobile-compatible']; "
+                "see list_tags for the vocabulary")]
+ExcludeTags = Annotated[list[str] | None, Field(
+    description="AI tags the addon must not have, e.g. ['obsolete', 'no-description', 'paid']")]
 
 
 def register_tools(mcp: MCPServer, services: Services) -> None:
     catalog = services.catalog
 
     @mcp.tool(annotations=READ_ONLY, description=(
-        "Full-text search over addon titles, AnkiWeb descriptions, AI summaries, GitHub topics and repo "
-        "descriptions. Returns compact addon cards ranked by relevance."))
+        "Full-text search over addon titles, AnkiWeb descriptions, AI summaries and tags, GitHub topics and "
+        "repo descriptions. Returns compact addon cards ranked by relevance."))
     def search_addons(query: Annotated[str, Field(description="Search words, e.g. 'image occlusion'")],
                       limit: Limit = 20, offset: Offset = 0,
                       compatible_with_anki: AnkiVersion = None,
+                      tags: Tags = None, exclude_tags: ExcludeTags = None,
                       snapshot: Snapshot = "latest") -> Page[AddonCard]:
         with tool_errors():
-            filters = AddonFilters(compatible_with_anki=compatible_with_anki)
+            filters = AddonFilters(compatible_with_anki=compatible_with_anki, tags=tags, exclude_tags=exclude_tags)
             return catalog.search(query, limit, offset, filters, parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description=(
@@ -59,6 +66,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
             description="Description mentions AI use (e.g. 'vibe-coded', 'claude')")] = None,
         has_ai_tooling: Annotated[bool | None, Field(
             description="Repository has AI coding tool traces (e.g. AGENTS.md, .cursor)")] = None,
+        tags: Tags = None, exclude_tags: ExcludeTags = None,
         sort_by: SortField = SortField.RATING, descending: bool = True,
         limit: Limit = 20, offset: Offset = 0, snapshot: Snapshot = "latest",
     ) -> Page[AddonCard]:
@@ -68,13 +76,14 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
                 has_tests=has_tests, has_forum=has_forum, license=license, language=language,
                 description_language=description_language, topic=topic, compatible_with_anki=compatible_with_anki,
                 updated_after=updated_after, updated_before=updated_before, archived=archived,
-                has_ai_declaration=has_ai_declaration, has_ai_tooling=has_ai_tooling,
+                has_ai_declaration=has_ai_declaration, has_ai_tooling=has_ai_tooling, tags=tags,
+                exclude_tags=exclude_tags,
             )
             return catalog.filter(filters, sort_by, descending, limit, offset, parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Full record of one addon: AnkiWeb info and version branches, GitHub repository data and manifest, "
-        "Anki Forum topic and AI summary. Long texts and link lists are omitted unless requested in 'include'."))
+        "Anki Forum topic and AI summary and tags. Long texts and link lists are omitted unless requested in 'include'."))
     def get_addon(addon_id: AddonId, include: list[AddonInclude] | None = None,
                   max_chars: MaxChars = 4000, snapshot: Snapshot = "latest") -> AddonDetails:
         parts = set(include or [])
@@ -111,7 +120,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Addons similar to a given one: overlapping wording in title, summary and topics, shared GitHub "
-        "topics, or the same author."))
+        "topics, shared AI function tags, or the same author."))
     def find_similar_addons(addon_id: AddonId, limit: Limit = 10, snapshot: Snapshot = "latest") -> list[SimilarAddon]:
         with tool_errors():
             return services.similarity.similar(addon_id, limit, parse_snapshot(snapshot))
@@ -142,18 +151,28 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Dataset statistics: addon counts (total, with GitHub, with forum topic, with tests) and optional "
-        "group-by counts, e.g. by license or primary language."))
+        "group-by counts, e.g. by license, primary language or AI tag (ai_tag)."))
     def get_statistics(group_by: list[GroupField] | None = None,
                        top_values: Annotated[int, Field(ge=1, le=200)] = 20,
                        snapshot: Snapshot = "latest") -> Statistics:
         with tool_errors():
             return services.stats.statistics(parse_snapshot(snapshot), group_by, top_values)
 
-    @mcp.tool(annotations=READ_ONLY, description="Leaderboard of addons by rating, likes, stars, forum posts or recency.")
+    @mcp.tool(annotations=READ_ONLY, description=(
+        "Leaderboard of addons by rating, likes, stars, forum posts or recency, optionally within one AI tag."))
     def top_addons(metric: TopMetric = TopMetric.RATING, limit: Limit = 10,
+                   tag: Annotated[str | None, Field(description="Only addons with this AI tag, e.g. 'fsrs'")] = None,
                    snapshot: Snapshot = "latest") -> Page[AddonCard]:
         with tool_errors():
-            return catalog.top(metric, limit, parse_snapshot(snapshot))
+            return catalog.top(metric, limit, parse_snapshot(snapshot), tag)
+
+    @mcp.tool(annotations=READ_ONLY, description=(
+        "Vocabulary of AI tags that classify addons: 'function' tags say what an addon does (e.g. statistics, "
+        "cloze, fsrs), 'status' tags flag its state (e.g. obsolete, paid, beta). Each tag has a description "
+        "and the number of addons that carry it. Use the names in the tags/exclude_tags filters."))
+    def list_tags(snapshot: Snapshot = "latest") -> list[TagUsage]:
+        with tool_errors():
+            return services.tags.vocabulary(parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description="Available dataset snapshots (monthly) with their metadata.")
     def list_snapshots() -> list[SnapshotInfo]:

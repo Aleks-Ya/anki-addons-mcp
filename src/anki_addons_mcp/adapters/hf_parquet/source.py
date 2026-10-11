@@ -13,6 +13,7 @@ log = logging.getLogger(__name__)
 LATEST_DIR = "latest"
 HISTORY_DIR = "history"
 DATA_FILE = "parquet/data.parquet"
+TAGS_FILE = "parquet/tags.parquet"
 METADATA_FILE = "metadata.json"
 README_FILE = "README.md"
 
@@ -30,6 +31,8 @@ class DatasetSource(Protocol):
     def snapshot_info(self, snapshot: date) -> SnapshotInfo: ...
 
     def data_file(self, snapshot: date) -> Path: ...
+
+    def tags_file(self, snapshot: date) -> Path: ...
 
     def readme(self) -> str | None: ...
 
@@ -92,12 +95,12 @@ class _BaseSource:
         self._infos[snapshot] = info
         return info
 
-    def _data_relative(self, snapshot: date) -> str:
+    def _snapshot_relative(self, snapshot: date, file: str) -> str:
         if snapshot == self.latest_date():
-            return f"{LATEST_DIR}/{DATA_FILE}"
+            return f"{LATEST_DIR}/{file}"
         if snapshot not in self.snapshot_dates():
             raise SnapshotNotFound(snapshot)
-        return f"{HISTORY_DIR}/{snapshot.isoformat()}/{DATA_FILE}"
+        return f"{HISTORY_DIR}/{snapshot.isoformat()}/{file}"
 
 
 class LocalDatasetSource(_BaseSource):
@@ -123,7 +126,10 @@ class LocalDatasetSource(_BaseSource):
         return [p.name for p in history.iterdir() if p.is_dir()] if history.is_dir() else []
 
     def data_file(self, snapshot: date) -> Path:
-        return self._root / self._data_relative(snapshot)
+        return self._root / self._snapshot_relative(snapshot, DATA_FILE)
+
+    def tags_file(self, snapshot: date) -> Path:
+        return self._root / self._snapshot_relative(snapshot, TAGS_FILE)
 
     def readme(self) -> str | None:
         path = self._root / README_FILE
@@ -175,9 +181,12 @@ class HfDatasetSource(_BaseSource):
             return self._history
 
     def data_file(self, snapshot: date) -> Path:
-        relative = self._data_relative(snapshot)
+        relative = self._snapshot_relative(snapshot, DATA_FILE)
         log.info("Fetching %s", relative)
         return self._download(relative)
+
+    def tags_file(self, snapshot: date) -> Path:
+        return self._download(self._snapshot_relative(snapshot, TAGS_FILE))
 
     def readme(self) -> str | None:
         try:

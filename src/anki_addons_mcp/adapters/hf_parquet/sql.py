@@ -56,23 +56,41 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("forum_posts_count", "CAST(forum.posts_count AS BIGINT)", "BIGINT"),
     ("ai_summary", "ai.summary", "VARCHAR, LLM-generated summary (may be inaccurate)"),
     ("ai_model", "ai.model", "VARCHAR, model that wrote ai_summary"),
+    ("ai_tags", "ai.tags", "VARCHAR[], LLM-picked tags (may be inaccurate), names from the `tags` table"),
 ]
 TOPICS_TEXT = "topics_text"
-SEARCH_COLUMNS = ["title", "description", "ai_summary", TOPICS_TEXT, "github_repo_description"]
+TAGS_TEXT = "tags_text"
+HELPER_COLUMNS = [TOPICS_TEXT, TAGS_TEXT]
+SEARCH_COLUMNS = ["title", "description", "ai_summary", TOPICS_TEXT, TAGS_TEXT, "github_repo_description"]
 SQL_VIEW = "addons"
+TAGS_VIEW = "tags"
+TAG_COLUMNS: list[tuple[str, str]] = [
+    ("name", "VARCHAR, tag name as used in addons.ai_tags"),
+    ("group", "VARCHAR, 'function' (what the addon does) or 'status' (paid, obsolete, beta, ...)"),
+    ("description", "VARCHAR, meaning of the tag"),
+]
 _DENIED_FUNCTIONS = frozenset({"getenv", "current_setting"})
 
 
 def flat_select(parquet_path: str) -> str:
     columns = ",\n  ".join(f"{expr} AS {name}" for name, expr, _ in FLAT_COLUMNS)
     escaped = parquet_path.replace("'", "''")
-    return (f"SELECT\n  {columns},\n  array_to_string(github.topics, ' ') AS {TOPICS_TEXT}\n"
+    return (f"SELECT\n  {columns},\n  array_to_string(github.topics, ' ') AS {TOPICS_TEXT},\n"
+            f"  array_to_string(ai.tags, ' ') AS {TAGS_TEXT}\n"
             f"FROM read_parquet('{escaped}')")
+
+
+def tags_select(parquet_path: str) -> str:
+    escaped = parquet_path.replace("'", "''")
+    return f"SELECT name, \"group\", description FROM read_parquet('{escaped}')"
 
 
 def schema_description() -> str:
     lines = [f"- {name}: {desc}" for name, _, desc in FLAT_COLUMNS]
-    return f"Table `{SQL_VIEW}` (one row per addon of the requested snapshot):\n" + "\n".join(lines)
+    tag_lines = [f"- {name}: {desc}" for name, desc in TAG_COLUMNS]
+    return (f"Table `{SQL_VIEW}` (one row per addon of the requested snapshot):\n" + "\n".join(lines)
+            + f"\n\nTable `{TAGS_VIEW}` (the tag vocabulary of the snapshot, quote \"group\"):\n"
+            + "\n".join(tag_lines))
 
 
 def _walk(node: Any, ctes: set[str], tables: list[tuple[str, str, str]]) -> None:

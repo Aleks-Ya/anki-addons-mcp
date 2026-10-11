@@ -33,6 +33,8 @@ class AddonFilters(BaseModel):
     has_ai_declaration: bool | None = None
     has_ai_tooling: bool | None = None
     compatible_with_anki: str | None = None
+    tags: list[str] | None = None
+    exclude_tags: list[str] | None = None
 
 
 class AddonQuery(BaseModel):

@@ -11,6 +11,7 @@ from anki_addons_mcp.domain.models import (
     Page,
     SnapshotInfo,
     SqlResult,
+    Tag,
     TextKind,
 )
 from anki_addons_mcp.domain.query import AddonQuery
@@ -42,6 +43,9 @@ class AddonRepository(ABC):
 
     @abstractmethod
     def group_counts(self, field: GroupField, snapshot: date | None = None) -> dict[str, int]: ...
+
+    @abstractmethod
+    def list_tags(self, snapshot: date | None = None) -> list[Tag]: ...
 
     @abstractmethod
     def get_documentation(self) -> str: ...

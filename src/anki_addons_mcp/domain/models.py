@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, computed_field, field_validator
 
-AI_PROVENANCE = "LLM-generated summary; may contain mistakes. Verify against the description or README."
+AI_PROVENANCE = "LLM-generated summary and tags; may contain mistakes. Verify against the description or README."
 
 
 class Branch(BaseModel):
@@ -98,6 +98,7 @@ class ForumInfo(BaseModel):
 class AiInfo(BaseModel):
     summary: str | None = None
     model: str | None = None
+    tags: list[str] = Field(default_factory=list)
 
     @computed_field
     def provenance(self) -> str:
@@ -134,6 +135,7 @@ class AddonCard(BaseModel):
     github_archived: bool | None = None
     license: str | None = None
     forum_posts_count: int | None = None
+    ai_tags: list[str] = Field(default_factory=list, description=AI_PROVENANCE)
     score: float | None = None
 
     @classmethod
@@ -156,8 +158,15 @@ class AddonCard(BaseModel):
             github_archived=github.archived if github else None,
             license=github.license if github else None,
             forum_posts_count=details.forum.posts_count if details.forum else None,
+            ai_tags=list(details.ai.tags) if details.ai else [],
             score=score,
         )
+
+
+class Tag(BaseModel):
+    name: str
+    group: str
+    description: str | None = None
 
 
 class Page[T](BaseModel):
@@ -207,6 +216,7 @@ class GroupField(StrEnum):
     GITHUB_TOPIC = "github_topic"
     AI_DECLARATION_MARKER = "ai_declaration_marker"
     AI_TOOLING_MARKER = "ai_tooling_marker"
+    AI_TAG = "ai_tag"
 
 
 NONE_GROUP = "(none)"

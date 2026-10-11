@@ -2,8 +2,10 @@ from mcp.server.mcpserver import MCPServer
 
 from anki_addons_mcp.application.services import Services
 
-AI_NOTE = ("AI summaries (ai_summary) are LLM-generated and can be wrong; say so when you rely on them "
-           "and prefer the AnkiWeb description or README for important claims.")
+AI_NOTE = ("AI summaries and tags (ai_summary, ai_tags) are LLM-generated and can be wrong; say so when you rely "
+           "on them and prefer the AnkiWeb description or README for important claims.")
+SKIP_TAGS = "exclude_tags=['obsolete', 'no-description']"
+WARN_TAGS = "Flag addons tagged paid, beta, fork-or-reupload or service-client."
 
 
 def register_prompts(mcp: MCPServer, services: Services) -> None:
@@ -14,14 +16,16 @@ def register_prompts(mcp: MCPServer, services: Services) -> None:
                   if anki_version else "3. Note each candidate's supported Anki versions (anki_version field).\n")
         return (
             f"Find Anki addons for this task: {task}.{version}\n\n"
-            "1. Call search_addons with a few different phrasings of the task (limit 10 each).\n"
+            "1. Call search_addons with a few different phrasings of the task (limit 10 each). Also call "
+            "list_tags, pick the function tags that match the task and call filter_addons with them "
+            f"(tags=[...], {SKIP_TAGS}).\n"
             "2. Pick up to 8 promising candidates; use get_addon (include=['description']) where the card is "
             "not enough to judge.\n"
             f"{compat}"
             "4. Call assess_maintenance for the candidates.\n"
             "5. Recommend 3-5 addons. For each: what it does, why it fits, rating/likes, compatibility, "
             "maintenance label, and the AnkiWeb link. Mention trade-offs and warn about stale or "
-            "incompatible ones.\n\n" + AI_NOTE
+            f"incompatible ones. {WARN_TAGS}\n\n" + AI_NOTE
         )
 
     @mcp.prompt(description="Side-by-side comparison of addons")
@@ -64,9 +68,10 @@ def register_prompts(mcp: MCPServer, services: Services) -> None:
         return (
             "Write a digest of the Anki addon ecosystem.\n\n"
             f"1. Call diff_snapshots with {frm}to_snapshot={to_snapshot}, limit 20.\n"
-            "2. Call get_statistics for both snapshots with group_by=['license', 'ai_tooling_marker'].\n"
+            "2. Call get_statistics for both snapshots with group_by=['license', 'ai_tooling_marker', 'ai_tag'].\n"
             "3. Write sections: headline numbers, notable new addons, rising addons (rating and stars), "
-            "removed addons, recently updated popular addons, trends (licenses, AI-assisted development).\n"
+            "removed addons, recently updated popular addons, trends (categories by AI tag, licenses, "
+            "AI-assisted development).\n"
             "Link every addon to its AnkiWeb page.\n\n" + AI_NOTE
         )
 
@@ -74,7 +79,8 @@ def register_prompts(mcp: MCPServer, services: Services) -> None:
     def before_you_build(idea: str) -> str:
         return (
             f"An addon developer is considering building: {idea}\n\n"
-            "1. search_addons with several phrasings to find overlapping addons.\n"
+            "1. search_addons with several phrasings to find overlapping addons; also call list_tags and "
+            "filter_addons with the function tags that fit the idea.\n"
             "2. For the closest 5, call get_addon (include=['readme']) to see languages, dependencies, tests "
             "and manifest, and assess_maintenance.\n"
             "3. Report: existing solutions and how well they are received, how they are implemented, "
@@ -88,4 +94,33 @@ def register_prompts(mcp: MCPServer, services: Services) -> None:
             "1. list_addons_by_author.\n2. assess_maintenance for each (up to 15).\n"
             "3. Report: what the author builds, reception (rating, likes, stars), upkeep, and the standout "
             "addons.\n\n" + AI_NOTE
+        )
+
+    @mcp.prompt(description="Best addons in one category (AI tag)")
+    def best_in_category(tag: str, anki_version: str = "") -> str:
+        compat = (f"4. Call check_compatibility with the candidate ids and anki_version={anki_version}.\n"
+                  if anki_version else "4. Note each candidate's supported Anki versions (anki_version field).\n")
+        return (
+            f"Find the best Anki addons in the category '{tag}'.\n\n"
+            "1. Call list_tags to confirm what the tag means (if it is not in the vocabulary, pick the closest "
+            "tags and say so).\n"
+            f"2. Call filter_addons with tags=['{tag}'], {SKIP_TAGS}, sorted by rating (limit 20); "
+            "also call top_addons with tag and metric=stars.\n"
+            "3. Call assess_maintenance for the top 8 candidates.\n"
+            f"{compat}"
+            "5. Recommend 3-5 addons, each with what it does, rating/likes, maintenance label and the AnkiWeb "
+            f"link. {WARN_TAGS}\n\n" + AI_NOTE
+        )
+
+    @mcp.prompt(description="Map of the addon ecosystem by category (AI tags)")
+    def category_landscape() -> str:
+        return (
+            "Describe the landscape of Anki addon categories.\n\n"
+            "1. Call list_tags for the categories and their addon counts.\n"
+            "2. For the 10 largest function tags, call top_addons with that tag (limit 3).\n"
+            "3. For each status tag, note how many addons carry it (e.g. how much of the catalog is obsolete "
+            "or paid).\n"
+            "4. Report: crowded categories and their leaders, small or under-served categories that could "
+            "use new addons, and categories where the leaders look stale (check with assess_maintenance).\n"
+            "Link every addon to its AnkiWeb page.\n\n" + AI_NOTE
         )
