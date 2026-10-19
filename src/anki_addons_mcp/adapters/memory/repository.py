@@ -184,7 +184,7 @@ class InMemoryAddonRepository(AddonRepository):
         return [data[i].without_texts() for i in dict.fromkeys(addon_ids) if i in data]
 
     def find(self, query: AddonQuery, snapshot: date | None = None) -> Page[AddonCard]:
-        terms = [t for t in _WORD.findall((query.text or "").lower())]
+        terms = list(_WORD.findall((query.text or "").lower()))
         rows: list[tuple[AddonDetails, float | None]] = []
         for details in self._data(snapshot).values():
             if not _matches(details, query.filters):

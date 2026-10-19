@@ -24,7 +24,7 @@ Anki Forum and AI-summary and AI-tag data, published as monthly snapshots.
 """
 
 
-async def _healthz(request: Request) -> JSONResponse:
+async def _healthz(request: Request) -> JSONResponse:  # NOSONAR: MCPServer.custom_route requires an async handler
     return JSONResponse({"status": "ok", "version": __version__})
 
 
@@ -39,7 +39,7 @@ def build_server(services: Services, log_level: str = "INFO") -> MCPServer:
     )
     register_tools(mcp, services)
     register_resources(mcp, services)
-    register_prompts(mcp, services)
+    register_prompts(mcp)
 
     mcp.custom_route("/healthz", methods=["GET"])(_healthz)
     return mcp

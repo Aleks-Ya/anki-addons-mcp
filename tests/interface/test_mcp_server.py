@@ -42,7 +42,8 @@ async def test_lists_tools_with_read_only_annotations(client: Client, repository
     sql_expected = {"query_sql"} if type(repository).__name__.startswith("DuckDb") else set()
     assert names == EXPECTED_TOOLS | sql_expected
     for tool in tools:
-        assert tool.annotations is not None and tool.annotations.read_only_hint
+        assert tool.annotations is not None
+        assert tool.annotations.read_only_hint
         assert tool.description
 
 
@@ -96,12 +97,14 @@ async def test_tags(client: Client) -> None:
     stats = await call(client, "get_statistics", group_by=["ai_tag"])
     assert stats["groups"][0]["counts"]["dictionary"] == 2
     unknown = await client.call_tool("filter_addons", {"tags": ["stats"]})
-    assert unknown.is_error and "list_tags" in unknown.content[0].text
+    assert unknown.is_error
+    assert "list_tags" in unknown.content[0].text
 
 
 async def test_get_addon_include(client: Client) -> None:
     plain = await call(client, "get_addon", addon_id=KANJI)
-    assert plain["description"] is None and plain["anki_web"]["links"] == []
+    assert plain["description"] is None
+    assert plain["anki_web"]["links"] == []
     full = await call(client, "get_addon", addon_id=KANJI, include=["readme", "links"])
     assert full["readme"].startswith("# Kanji Helper")
     assert full["anki_web"]["links"]
@@ -122,7 +125,8 @@ async def test_invalid_snapshot_is_tool_error(client: Client) -> None:
 
 async def test_texts(client: Client) -> None:
     readme = await call(client, "get_addon_readme", addon_id=KANJI, max_chars=100)
-    assert readme["kind"] == "readme" and not readme["truncated"]
+    assert readme["kind"] == "readme"
+    assert not readme["truncated"]
     description = await call(client, "get_addon_description", addon_id=KANJI)
     assert "kanji" in description["text"]
 
@@ -148,7 +152,8 @@ async def test_history_diff_and_snapshots(client: Client) -> None:
     history = await call(client, "get_addon_history", addon_id=KANJI)
     assert [p["rating"] for p in history["points"]] == [100, 130]
     diff = await call(client, "diff_snapshots")
-    assert diff["added_count"] == 1 and diff["removed_count"] == 1
+    assert diff["added_count"] == 1
+    assert diff["removed_count"] == 1
 
 
 async def test_statistics_top_similar_author(client: Client) -> None:
@@ -227,7 +232,8 @@ async def test_missing_resource_is_error(client: Client) -> None:
 async def test_prompt(client: Client) -> None:
     prompt = await client.get_prompt("upgrade_readiness", {"addon_ids": "1,2", "target_anki_version": "25.02"})
     text = prompt.messages[0].content.text  # type: ignore[union-attr]
-    assert "check_compatibility" in text and "25.02" in text
+    assert "check_compatibility" in text
+    assert "25.02" in text
     readiness = await client.get_prompt("anki_release_readiness", {"anki_version": "26.05"})
     text = readiness.messages[0].content.text  # type: ignore[union-attr]
     assert "compatible_with_anki=26.05" in text

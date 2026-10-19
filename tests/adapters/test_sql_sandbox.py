@@ -35,7 +35,8 @@ def test_tags_table(duckdb_repository: DuckDbAddonRepository) -> None:
         'JOIN tags t ON t.name = a.tag GROUP BY 1 ORDER BY 1', None, 10, 5)
     assert result.rows == [["function", 11], ["status", 3]]
     helpers = duckdb_repository.execute_readonly("SELECT * FROM addons LIMIT 1", OLD, 10, 5)
-    assert "tags_text" not in helpers.columns and "ai_tags" in helpers.columns
+    assert "tags_text" not in helpers.columns
+    assert "ai_tags" in helpers.columns
 
 
 @pytest.mark.parametrize(("snapshot", "expected"), [(None, [6, 8, 1]), (OLD, [0, 8, 2])])
@@ -49,7 +50,8 @@ def test_dataset_2_4_columns(duckdb_repository: DuckDbAddonRepository, snapshot:
 
 def test_row_cap(duckdb_repository: DuckDbAddonRepository) -> None:
     result = duckdb_repository.execute_readonly("SELECT id FROM addons", None, 3, 5)
-    assert result.row_count == 3 and result.truncated
+    assert result.row_count == 3
+    assert result.truncated
 
 
 def test_timeout(duckdb_repository: DuckDbAddonRepository) -> None:

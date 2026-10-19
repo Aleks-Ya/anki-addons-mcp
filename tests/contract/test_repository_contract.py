@@ -39,12 +39,17 @@ def test_get_addon(repository: AddonRepository) -> None:
     details = repository.get_addon(OCCLUSION)
     assert details is not None
     assert details.anki_web.title == "Image Occlusion Plus"
-    assert details.github is not None and details.github.stars == 500
-    assert details.github.manifest is not None and details.github.manifest.max_point_version == -250900
+    assert details.github is not None
+    assert details.github.stars == 500
+    assert details.github.manifest is not None
+    assert details.github.manifest.max_point_version == -250900
     assert details.github.url == "https://github.com/bob/image-occlusion"
-    assert details.forum is not None and details.forum.posts_count == 120
-    assert details.ai is not None and details.ai.summary == "Creates image occlusion cards."
-    assert details.description is None and details.readme is None
+    assert details.forum is not None
+    assert details.forum.posts_count == 120
+    assert details.ai is not None
+    assert details.ai.summary == "Creates image occlusion cards."
+    assert details.description is None
+    assert details.readme is None
 
 
 def test_links_and_repo_source_in_details(repository: AddonRepository) -> None:
@@ -68,13 +73,15 @@ def test_get_addon_in_old_snapshot_with_drifted_schema(repository: AddonReposito
     details = repository.get_addon(KANJI, OLD)
     assert details is not None
     assert details.anki_web.rating == 100
-    assert details.github is not None and details.github.manifest is None
+    assert details.github is not None
+    assert details.github.manifest is None
     assert repository.get_text(KANJI, TextKind.README, OLD) is None
 
 
 def test_unknown_snapshot(repository: AddonRepository) -> None:
+    unknown = date(2000, 1, 1)
     with pytest.raises(SnapshotNotFound):
-        repository.get_addon(KANJI, date(2000, 1, 1))
+        repository.get_addon(KANJI, unknown)
 
 
 def test_get_addons_keeps_order_and_skips_missing(repository: AddonRepository) -> None:
@@ -210,11 +217,14 @@ def test_find_sort_puts_nulls_last_in_both_directions(repository: AddonRepositor
 def test_card_fields(repository: AddonRepository) -> None:
     card = repository.find(AddonQuery(filters=AddonFilters(addon_ids=[KANJI]))).items[0]
     assert card.title == "Kanji Helper"
-    assert card.github_user == "alice" and card.github_stars == 50
-    assert card.license == "MIT" and card.forum_posts_count == 30
+    assert card.github_user == "alice"
+    assert card.github_stars == 50
+    assert card.license == "MIT"
+    assert card.forum_posts_count == 30
     assert "ai_model" not in card.model_dump()
     no_github = repository.find(AddonQuery(filters=AddonFilters(addon_ids=[NO_GITHUB]))).items[0]
-    assert no_github.anki_version is None and no_github.github_stars is None
+    assert no_github.anki_version is None
+    assert no_github.github_stars is None
     assert no_github.anki_point_version is None
     assert no_github.anki_version_kind == VersionKind.UNKNOWN
     assert (card.anki_point_version, card.anki_version_kind) == (250200, VersionKind.TESTED)
@@ -268,7 +278,8 @@ def test_group_counts(repository: AddonRepository) -> None:
     assert repository.group_counts(GroupField.LICENSE) == {
         "MIT": 4, "GPL-3.0": 1, "AGPL-3.0": 1, NONE_GROUP: 2}
     topics = repository.group_counts(GroupField.GITHUB_TOPIC)
-    assert topics["kanji"] == 2 and topics[NONE_GROUP] == 2
+    assert topics["kanji"] == 2
+    assert topics[NONE_GROUP] == 2
     assert repository.group_counts(GroupField.AI_TOOLING_MARKER) == {
         "claude-code": 1, "agents-md": 1, NONE_GROUP: 7}
     assert repository.group_counts(GroupField.UPDATE_YEAR)["2026"] == 5
@@ -295,18 +306,22 @@ def test_list_tags(repository: AddonRepository) -> None:
     assert [t.name for t in tags][:2] == ["card-creation", "card-templates"]
     assert {t.group for t in tags} == {"function", "status"}
     assert [t.name for t in repository.list_tags(OLD)] == [t.name for t in tags]
+    unknown = date(2000, 1, 1)
     with pytest.raises(SnapshotNotFound):
-        repository.list_tags(date(2000, 1, 1))
+        repository.list_tags(unknown)
 
 
 def test_ai_tags_on_cards_and_details(repository: AddonRepository) -> None:
     details = repository.get_addon(HEATMAP)
-    assert details is not None and details.ai is not None
-    assert details.ai.summary is None and details.ai.tags == ["statistics", "progress-tracking"]
+    assert details is not None
+    assert details.ai is not None
+    assert details.ai.summary is None
+    assert details.ai.tags == ["statistics", "progress-tracking"]
     card = repository.find(AddonQuery(filters=AddonFilters(addon_ids=[KANJI]))).items[0]
     assert card.ai_tags == ["dictionary", "card-templates", "mobile-compatible"]
     no_tags = repository.get_addon(SAME_AUTHOR)
-    assert no_tags is not None and no_tags.ai is None
+    assert no_tags is not None
+    assert no_tags.ai is None
 
 
 def test_filter_by_tags(repository: AddonRepository) -> None:

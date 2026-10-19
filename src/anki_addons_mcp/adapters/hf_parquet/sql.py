@@ -7,6 +7,8 @@ import duckdb
 
 from anki_addons_mcp.domain.errors import InvalidQuery
 
+_ISO_TIMESTAMP = "VARCHAR, ISO timestamp"
+
 FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("id", "id", "BIGINT, AnkiWeb addon id"),
     ("title", "anki_web.title", "VARCHAR"),
@@ -51,7 +53,7 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
      "VARCHAR, how the repo was matched: 'override', 'contact_author', 'self_reference', 'ai', 'most_linked'"),
     ("github_languages", "github.languages", "VARCHAR[]"),
     ("github_stars", "github.stars", "BIGINT"),
-    ("github_last_commit", "github.last_commit", "VARCHAR, ISO timestamp"),
+    ("github_last_commit", "github.last_commit", _ISO_TIMESTAMP),
     ("github_links", "github.links", "STRUCT(url, user, repo)[]"),
     ("github_action_count", "github.action_count", "BIGINT, GitHub Actions workflows"),
     ("github_tests_count", "github.tests_count", "BIGINT, test files"),
@@ -63,8 +65,8 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("github_repo_description", "github.repo_description", "VARCHAR"),
     ("github_homepage", "github.homepage", "VARCHAR"),
     ("github_archived", "github.archived", "BOOLEAN"),
-    ("github_pushed_at", "github.pushed_at", "VARCHAR, ISO timestamp"),
-    ("github_created_at", "github.created_at", "VARCHAR, ISO timestamp"),
+    ("github_pushed_at", "github.pushed_at", _ISO_TIMESTAMP),
+    ("github_created_at", "github.created_at", _ISO_TIMESTAMP),
     ("github_primary_language", "github.primary_language", "VARCHAR"),
     ("github_language_bytes", "github.language_bytes", "STRUCT(name, bytes)[]"),
     ("github_manifest", "CAST(to_json(github.manifest) AS VARCHAR)",

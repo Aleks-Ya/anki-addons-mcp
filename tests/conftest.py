@@ -1,4 +1,3 @@
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -26,8 +25,8 @@ def duckdb_repository(dataset_dir: Path) -> DuckDbAddonRepository:
 
 
 @pytest.fixture(params=["memory", "duckdb"])
-def repository(request: pytest.FixtureRequest) -> Iterator[AddonRepository]:
-    yield request.getfixturevalue(f"{request.param}_repository")
+def repository(request: pytest.FixtureRequest) -> AddonRepository:
+    return request.getfixturevalue(f"{request.param}_repository")
 
 
 @pytest.fixture

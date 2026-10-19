@@ -63,8 +63,9 @@ def test_search_rejects_empty_query(services: Services) -> None:
 
 
 def test_limit_is_bounded(services: Services) -> None:
+    filters = AddonFilters()
     with pytest.raises(InvalidQuery):
-        services.catalog.filter(AddonFilters(), limit=1000)
+        services.catalog.filter(filters, limit=1000)
 
 
 def test_get_with_texts_and_without_links(services: Services) -> None:
@@ -73,7 +74,8 @@ def test_get_with_texts_and_without_links(services: Services) -> None:
     assert details.readme == "# Kanji He"
     assert details.description == "Look up ka"
     assert details.anki_web.links == []
-    assert details.github is not None and details.github.links == []
+    assert details.github is not None
+    assert details.github.links == []
     assert services.catalog.get(KANJI).anki_web.links != []
 
 
@@ -84,7 +86,9 @@ def test_get_missing(services: Services) -> None:
 
 def test_text_truncation(services: Services) -> None:
     text = services.catalog.text(KANJI, TextKind.README, max_chars=5)
-    assert text.text == "# Kan" and text.truncated and text.total_chars > 5
+    assert text.text == "# Kan"
+    assert text.truncated
+    assert text.total_chars > 5
     assert services.catalog.text(NO_GITHUB, TextKind.README).text is None
 
 
@@ -186,8 +190,9 @@ def test_diff_validation(services: Services) -> None:
         services.history.diff(to=OLD)
     with pytest.raises(InvalidQuery):
         services.history.diff(LATEST, OLD)
+    unknown = LATEST.replace(year=2000)
     with pytest.raises(SnapshotNotFound):
-        services.history.diff(LATEST.replace(year=2000))
+        services.history.diff(unknown)
 
 
 def test_similar(services: Services) -> None:
@@ -241,16 +246,19 @@ def test_sql_disabled_for_memory(services: Services) -> None:
 
 def test_tag_vocabulary(services: Services) -> None:
     vocabulary = services.tags.vocabulary()
-    assert vocabulary[0].name == "dictionary" and vocabulary[0].addon_count == 2
+    assert vocabulary[0].name == "dictionary"
+    assert vocabulary[0].addon_count == 2
     assert [t.group for t in vocabulary].index("status") == 10
     assert next(t for t in vocabulary if t.name == "paid").addon_count == 0
 
 
 def test_unknown_tag_is_rejected(services: Services) -> None:
+    unknown_tag = AddonFilters(tags=["stats"])
     with pytest.raises(InvalidQuery, match="Unknown tag 'stats'"):
-        services.catalog.filter(AddonFilters(tags=["stats"]))
+        services.catalog.filter(unknown_tag)
+    unknown_exclude_tag = AddonFilters(exclude_tags=["free"])
     with pytest.raises(InvalidQuery, match="Unknown tag 'free'"):
-        services.catalog.search("kanji", filters=AddonFilters(exclude_tags=["free"]))
+        services.catalog.search("kanji", filters=unknown_exclude_tag)
     with pytest.raises(InvalidQuery):
         services.catalog.by_tag("nope")
 

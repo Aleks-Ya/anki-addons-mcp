@@ -1,7 +1,5 @@
 from mcp.server.mcpserver import MCPServer
 
-from anki_addons_mcp.application.services import Services
-
 AI_NOTE = ("AI summaries and tags (ai_summary, ai_tags) are LLM-generated and can be wrong; say so when you rely "
            "on them and prefer the AnkiWeb description or README for important claims.")
 SKIP_TAGS = "exclude_tags=['obsolete', 'no-description']"
@@ -10,7 +8,7 @@ VERDICTS = ("Verdicts: 'unsupported' above a hard limit means Anki disables the 
             "tested on an older Anki and still runs, untested; 'unknown' means the author gave no upper version.")
 
 
-def register_prompts(mcp: MCPServer, services: Services) -> None:
+def register_prompts(mcp: MCPServer) -> None:
     @mcp.prompt(description="Recommend addons for a task, checking compatibility and maintenance")
     def find_addon_for_task(task: str, anki_version: str = "") -> str:
         version = f" The user runs Anki {anki_version}." if anki_version else ""
