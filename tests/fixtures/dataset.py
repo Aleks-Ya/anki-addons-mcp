@@ -22,6 +22,9 @@ NEW_ADDON = 1007
 REMOVED = 1008
 SAME_AUTHOR = 1009
 
+# AnkiWeb author groups of the latest snapshot; the id is the smallest addon id of the group.
+ALICE_ADDONS = [KANJI, NO_GITHUB, SAME_AUTHOR]
+
 TAGS = [
     Tag(name="card-creation", group="function", description="Building notes from text"),
     Tag(name="card-templates", group="function", description="Note types and templates"),
@@ -72,8 +75,10 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
           branches: list[tuple[str | None, str | None]] | None = None, description: str = "",
           ai_declaration: list[str] | None = None, lang: str | None = "en",
           github: dict[str, Any] | None = None, forum: dict[str, Any] | None = None,
-          ai_summary: str | None = None, ai_tags: list[str] | None = None) -> dict[str, Any]:
+          ai_summary: str | None = None, ai_tags: list[str] | None = None,
+          author_addons: list[int] | None = None) -> dict[str, Any]:
     point_version, version_kind = _addons_list_version(anki_version)
+    group = author_addons or [addon_id]
     return {
         "id": addon_id,
         "anki_web": {
@@ -95,10 +100,14 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
             "ai_declaration_markers": ai_declaration or [],
             "description_language": lang,
             "description_language_confidence": 0.9 if lang else None,
+            "description_html": f"<p>{description}</p>" if description else None,
+            "description_pre_wrap": update_date < "2023-08",
+            "other_items_count": len(group) - 1,
         },
         "github": github,
         "forum": forum,
         "ai": {"summary": ai_summary, "model": "test-model", "tags": ai_tags or []} if ai_summary or ai_tags else None,
+        "author": {"id": min(group), "addon_count": len(group)},
     }
 
 
@@ -131,6 +140,7 @@ def latest_records() -> list[dict[str, Any]]:
         addon(KANJI, "Kanji Helper", rating=130, likes=125, dislikes=5, update_date="2026-09-20",
               anki_version="25.02~", branches=[("2.1.0", "2.1.49"), ("25.02", "+")],
               description="Look up kanji stroke order and readings while reviewing japanese vocabulary.",
+              author_addons=ALICE_ADDONS,
               ai_summary="Shows kanji stroke order and readings during review.",
               ai_tags=["dictionary", "card-templates", "mobile-compatible"],
               github=github("alice", "kanji-helper", stars=50, tests=12, actions=2, topics=["japanese", "kanji"],
@@ -157,6 +167,7 @@ def latest_records() -> list[dict[str, Any]]:
                             license=None)),
         addon(NO_GITHUB, "Simple Timer", rating=15, likes=15, update_date="2025-11-11", anki_version="",
               branches=[("2.1.50", "+")], description="A timer for review sessions. Zeitmesser.", lang="de",
+              author_addons=ALICE_ADDONS,
               ai_tags=["timer"]),
         addon(VIBE, "Vibe Deck Tools", rating=4, likes=3, dislikes=1, update_date="2026-09-29",
               anki_version="25.09~", branches=[("25.09", "+")], description="Deck tools vibe-coded with claude.",
@@ -169,6 +180,7 @@ def latest_records() -> list[dict[str, Any]]:
               github=github("frank", "kanji-quiz", stars=5, topics=["kanji", "quiz"])),
         addon(SAME_AUTHOR, "Alice Utilities", rating=42, likes=41, dislikes=1, update_date="2026-05-05",
               anki_version="23.10~", branches=[("23.10", "+")], description="Assorted utilities.",
+              author_addons=ALICE_ADDONS,
               github=github("Alice", "alice-utils", stars=20, topics=["utilities"])),
     ]
 
@@ -183,6 +195,8 @@ def old_records() -> list[dict[str, Any]]:
     by_id[REMOVED] = addon(REMOVED, "Gone Addon", rating=7, likes=7, update_date="2022-02-02",
                            description="Will be removed.")
     for record in by_id.values():
+        # Snapshots collected before authors were tracked: an all-null column, as published.
+        record["author"] = None
         if record["github"]:
             record["github"]["manifest"] = None
             record["github"]["readme"] = None
@@ -216,6 +230,7 @@ def to_details(record: dict[str, Any]) -> AddonDetails:
     return AddonDetails.model_validate({
         **data,
         "description": data["anki_web"]["description"] or None,
+        "description_html": data["anki_web"]["description_html"],
         "readme": gh.get("readme") if gh else None,
     })
 

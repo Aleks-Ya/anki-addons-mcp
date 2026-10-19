@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from anki_addons_mcp.adapters.memory.repository import InMemoryAddonRepository
@@ -11,6 +13,7 @@ from anki_addons_mcp.domain.errors import AddonNotFound, InvalidQuery, SnapshotN
 from anki_addons_mcp.domain.models import GroupField, TextKind, VersionKind, approval_score
 from anki_addons_mcp.domain.query import AddonFilters
 from tests.fixtures.dataset import (
+    ALICE_ADDONS,
     HEATMAP,
     KANJI,
     LATEST,
@@ -95,6 +98,30 @@ def test_by_author_is_case_insensitive(services: Services) -> None:
     assert {c.id for c in services.catalog.by_author("ALICE").items} == {KANJI, SAME_AUTHOR}
 
 
+def test_by_author_id(services: Services) -> None:
+    assert {c.id for c in services.catalog.by_author(author_id=KANJI).items} == set(ALICE_ADDONS)
+
+
+def test_by_author_of_addon(services: Services) -> None:
+    assert {c.id for c in services.catalog.by_author(addon_id=SAME_AUTHOR).items} == set(ALICE_ADDONS)
+
+
+@pytest.mark.parametrize("arguments", [{}, {"github_user": "alice", "author_id": KANJI}])
+def test_by_author_needs_exactly_one_key(services: Services, arguments: dict[str, Any]) -> None:
+    with pytest.raises(InvalidQuery, match="exactly one"):
+        services.catalog.by_author(**arguments)
+
+
+def test_by_author_of_addon_without_author_data(services: Services) -> None:
+    with pytest.raises(InvalidQuery, match="no AnkiWeb author data"):
+        services.catalog.by_author(addon_id=KANJI, snapshot=OLD)
+
+
+def test_by_author_of_missing_addon(services: Services) -> None:
+    with pytest.raises(AddonNotFound):
+        services.catalog.by_author(addon_id=424242)
+
+
 def test_compatibility(services: Services) -> None:
     verdicts = services.compatibility.check([KANJI, OCCLUSION, HEATMAP], "25.10")
     assert [v.verdict for v in verdicts] == [Support.SUPPORTED, Support.LIKELY, Support.UNSUPPORTED]
@@ -169,7 +196,13 @@ def test_similar(services: Services) -> None:
     assert KANJI not in by_id
     assert similar[0].card.id == NEW_ADDON
     assert any("shared GitHub topics" in r for r in by_id[NEW_ADDON].reasons)
-    assert any("same author" in r for r in by_id[SAME_AUTHOR].reasons)
+    assert "same AnkiWeb author" in by_id[SAME_AUTHOR].reasons
+
+
+def test_similar_falls_back_to_github_user_without_authors(services: Services) -> None:
+    similar = services.similarity.similar(KANJI, 5, OLD)
+    same_author = next(s for s in similar if s.card.id == SAME_AUTHOR)
+    assert "same author (alice)" in same_author.reasons
 
 
 @pytest.fixture

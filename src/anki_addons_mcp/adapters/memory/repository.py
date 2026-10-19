@@ -50,6 +50,8 @@ def _anki_web_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
         checks.append(bool(aw.update_date) and (aw.update_date or "") <= f.updated_before.isoformat())
     if f.has_ai_declaration is not None:
         checks.append(bool(aw.ai_declaration_markers) == f.has_ai_declaration)
+    if f.author_id is not None:
+        checks.append(d.author is not None and d.author.id == f.author_id)
     return checks
 
 
@@ -205,7 +207,12 @@ class InMemoryAddonRepository(AddonRepository):
         details = self._data(snapshot).get(addon_id)
         if details is None:
             return None
-        return (details.description if kind == TextKind.DESCRIPTION else details.readme) or None
+        texts = {
+            TextKind.DESCRIPTION: details.description,
+            TextKind.DESCRIPTION_HTML: details.description_html,
+            TextKind.README: details.readme,
+        }
+        return texts[kind] or None
 
     def get_history(self, addon_id: int, from_: date | None = None, to: date | None = None) -> list[AddonHistoryPoint]:
         points = []
@@ -231,6 +238,7 @@ class InMemoryAddonRepository(AddonRepository):
             addon_with_github_number=sum(1 for a in addons if a.github is not None),
             addon_with_anki_forum_page_number=sum(1 for a in addons if a.forum and a.forum.anki_forum_url),
             addon_with_unit_tests_number=sum(1 for a in addons if a.github and a.github.tests_count),
+            author_number=len({a.author.id for a in addons if a.author}),
         )
 
     def group_counts(self, field: GroupField, snapshot: date | None = None) -> dict[str, int]:

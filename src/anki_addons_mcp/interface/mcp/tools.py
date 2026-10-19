@@ -52,6 +52,11 @@ HasAiDeclaration = Annotated[bool | None, Field(
     description="Description mentions AI use (e.g. 'vibe-coded', 'claude')")]
 HasAiTooling = Annotated[bool | None, Field(
     description="Repository has AI coding tool traces (e.g. AGENTS.md, .cursor)")]
+AuthorId = Annotated[int | None, Field(
+    description="Derived AnkiWeb author id (author_id of an addon card); null in snapshots collected before "
+                "authors were tracked")]
+DescriptionFormat = Literal["text", "html"]
+_DESCRIPTION_KINDS = {"text": TextKind.DESCRIPTION, "html": TextKind.DESCRIPTION_HTML}
 
 
 def _filters(arguments: dict[str, Any]) -> AddonFilters:
@@ -74,7 +79,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         compatible_with_anki: AnkiVersion = None,
         anki_version_kind: AnkiVersionKind = None, anki_version_at_least: AnkiVersionAtLeast = None,
         updated_after: date | None = None, updated_before: date | None = None,
-        archived: bool | None = None,
+        archived: bool | None = None, author_id: AuthorId = None,
         has_ai_declaration: HasAiDeclaration = None, has_ai_tooling: HasAiTooling = None,
         tags: Tags = None, exclude_tags: ExcludeTags = None,
         limit: Limit = 20, offset: Offset = 0, snapshot: Snapshot = "latest",
@@ -95,7 +100,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         compatible_with_anki: AnkiVersion = None,
         anki_version_kind: AnkiVersionKind = None, anki_version_at_least: AnkiVersionAtLeast = None,
         updated_after: date | None = None, updated_before: date | None = None,
-        archived: bool | None = None,
+        archived: bool | None = None, author_id: AuthorId = None,
         has_ai_declaration: HasAiDeclaration = None, has_ai_tooling: HasAiTooling = None,
         tags: Tags = None, exclude_tags: ExcludeTags = None,
         sort_by: SortField = SortField.RATING, descending: bool = True,
@@ -120,11 +125,14 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         with tool_errors():
             return catalog.text(addon_id, TextKind.README, max_chars, parse_snapshot(snapshot))
 
-    @mcp.tool(annotations=READ_ONLY, description="AnkiWeb description of an addon as plain text.")
-    def get_addon_description(addon_id: AddonId, max_chars: MaxChars = 20000,
+    @mcp.tool(annotations=READ_ONLY, description=(
+        "AnkiWeb description of an addon as plain text (format=text) or as the author's HTML (format=html). "
+        "The HTML is not sanitized; when anki_web.description_pre_wrap is true AnkiWeb renders it with "
+        "preserved line breaks."))
+    def get_addon_description(addon_id: AddonId, max_chars: MaxChars = 20000, format: DescriptionFormat = "text",
                               snapshot: Snapshot = "latest") -> AddonText:
         with tool_errors():
-            return catalog.text(addon_id, TextKind.DESCRIPTION, max_chars, parse_snapshot(snapshot))
+            return catalog.text(addon_id, _DESCRIPTION_KINDS[format], max_chars, parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Check whether addons support an Anki version, based on the parsed AnkiWeb branches (min and max "
@@ -153,10 +161,19 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         with tool_errors():
             return services.similarity.similar(addon_id, limit, parse_snapshot(snapshot))
 
-    @mcp.tool(annotations=READ_ONLY, description="All addons whose GitHub repository belongs to a GitHub user.")
-    def list_addons_by_author(github_user: str, snapshot: Snapshot = "latest") -> Page[AddonCard]:
+    @mcp.tool(annotations=READ_ONLY, description=(
+        "All addons of one author. Give exactly one of: github_user (addons whose GitHub repository belongs to "
+        "the user), author_id (the derived AnkiWeb author of addon cards), or addon_id (the AnkiWeb author of "
+        "that addon). AnkiWeb authors are derived from AnkiWeb's 'shared by this author' lists and are missing "
+        "in snapshots collected before authors were tracked; use github_user there."))
+    def list_addons_by_author(
+        github_user: Annotated[str | None, Field(description="GitHub user, e.g. 'glutanimate'")] = None,
+        author_id: AuthorId = None,
+        addon_id: Annotated[int | None, Field(description="Any addon of the author")] = None,
+        snapshot: Snapshot = "latest",
+    ) -> Page[AddonCard]:
         with tool_errors():
-            return catalog.by_author(github_user, parse_snapshot(snapshot))
+            return catalog.by_author(github_user, parse_snapshot(snapshot), author_id, addon_id)
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "One addon across monthly snapshots: rating, likes, GitHub stars, update date and Anki version, "
@@ -178,7 +195,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
             return services.history.diff(from_, to, limit)
 
     @mcp.tool(annotations=READ_ONLY, description=(
-        "Dataset statistics: addon counts (total, with GitHub, with forum topic, with tests) and optional "
+        "Dataset statistics: addon counts (total, with GitHub, with forum topic, with tests), the number of "
+        "AnkiWeb authors, and optional "
         "group-by counts, e.g. by license, primary language, AI tag (ai_tag) or Anki version kind "
         "(anki_version_kind)."))
     def get_statistics(group_by: list[GroupField] | None = None,

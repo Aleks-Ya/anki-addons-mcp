@@ -75,11 +75,15 @@ backends). `search_addons` accepts every filter of `filter_addons` (including AI
 `exclude_tags`) and combines them with the text query. Compatibility follows Anki's parsed versions (point versions
 and the `hard`/`tested`/`open`/`unknown` kind of the upper version); both tools filter by `anki_version_kind` and
 `anki_version_at_least`, and `filter_addons` also sorts by `anki_version`.
+`list_addons_by_author` takes a GitHub user, or an AnkiWeb author by `author_id` or by any of the author's
+addons (`addon_id`). AnkiWeb authors are derived by the dataset and are missing in snapshots collected before
+authors were tracked. `get_addon_description` returns plain text, or the author's unsanitized HTML with
+`format=html`.
 
 **Resources**: `anki-addons://dataset/readme`, `anki-addons://dataset/schema`,
 `anki-addons://dataset/anki-versions`, `anki-addons://snapshots`,
 `anki-addons://snapshots/{snapshot}/metadata`, `anki-addons://snapshots/{snapshot}/aggregation`,
-`anki-addons://addons/{addon_id}` (and `/readme`, `/description`, `/history`),
+`anki-addons://addons/{addon_id}` (and `/readme`, `/description`, `/description.html`, `/history`),
 `anki-addons://authors/{github_user}`, `anki-addons://tags`, `anki-addons://tags/{tag}`.
 
 **Prompts**: `find_addon_for_task`, `compare_addons`, `addon_health_report`, `upgrade_readiness`,

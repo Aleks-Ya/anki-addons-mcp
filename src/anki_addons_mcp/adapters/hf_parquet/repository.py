@@ -43,7 +43,12 @@ log = logging.getLogger(__name__)
 
 _PARALLEL_DOWNLOADS = 4
 
-_DETAIL_COLUMNS = [name for name, _, _ in FLAT_COLUMNS if name not in ("description", "github_readme")]
+_TEXT_COLUMNS = {
+    TextKind.DESCRIPTION: "description",
+    TextKind.DESCRIPTION_HTML: "description_html",
+    TextKind.README: "github_readme",
+}
+_DETAIL_COLUMNS = [name for name, _, _ in FLAT_COLUMNS if name not in _TEXT_COLUMNS.values()]
 
 # 95% Wilson lower bound of likes among votes; mirrors domain.models.approval_score.
 _APPROVAL = ("(CASE WHEN coalesce(likes, 0) + coalesce(dislikes, 0) = 0 THEN 0.0 ELSE "
@@ -111,6 +116,8 @@ def _anki_web_filters(f: AddonFilters, add: _Add) -> None:
         add("NULLIF(update_date, '') <= ?", f.updated_before.isoformat())
     if f.has_ai_declaration is not None:
         add("(coalesce(len(ai_declaration_markers), 0) > 0) = ?", f.has_ai_declaration)
+    if f.author_id is not None:
+        add("author_id = ?", f.author_id)
 
 
 def _github_filters(f: AddonFilters, add: _Add) -> None:
@@ -328,7 +335,7 @@ class DuckDbAddonRepository(AddonRepository):
         return Page[AddonCard](items=items, total=total, offset=query.offset, limit=query.limit)
 
     def get_text(self, addon_id: int, kind: TextKind, snapshot: date | None = None) -> str | None:
-        column = "description" if kind == TextKind.DESCRIPTION else "github_readme"
+        column = _TEXT_COLUMNS[kind]
         rows = self._select(f"SELECT {column} AS text FROM {{rel}} WHERE id = ?", [addon_id], snapshot)
         return (rows[0]["text"] or None) if rows else None
 
@@ -356,7 +363,8 @@ class DuckDbAddonRepository(AddonRepository):
         row = self._select(
             "SELECT count(*) AS addon_number, count_if(has_github) AS addon_with_github_number, "
             "count_if(has_forum) AS addon_with_anki_forum_page_number, "
-            "count_if(coalesce(github_tests_count, 0) > 0) AS addon_with_unit_tests_number FROM {rel}",
+            "count_if(coalesce(github_tests_count, 0) > 0) AS addon_with_unit_tests_number, "
+            "count(DISTINCT author_id) AS author_number FROM {rel}",
             [], snapshot)[0]
         return Aggregation.model_validate(row)
 

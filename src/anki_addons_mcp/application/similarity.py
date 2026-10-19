@@ -70,17 +70,20 @@ class SimilarityService:
 
     def _add_same_author(self, target: AddonDetails, scored: dict[int, SimilarAddon], limit: int,
                          snapshot: date | None) -> None:
-        author = target.github.user if target.github else None
-        if not author:
+        github_user = target.github.user if target.github else None
+        if target.author:
+            filters, reason = AddonFilters(author_id=target.author.id), "same AnkiWeb author"
+        elif github_user:
+            filters, reason = AddonFilters(github_user=github_user), f"same author ({github_user})"
+        else:
             return
-        same_author = self._repository.find(
-            AddonQuery(filters=AddonFilters(github_user=author), limit=limit), snapshot).items
+        same_author = self._repository.find(AddonQuery(filters=filters, limit=limit), snapshot).items
         for card in same_author:
             if card.id == target.id:
                 continue
             entry = scored.setdefault(card.id, SimilarAddon(card=card, score=0.0, reasons=[]))
             entry.score += 0.5
-            entry.reasons.append(f"same author ({author})")
+            entry.reasons.append(reason)
 
     def _add_topic_overlap(self, target: AddonDetails, scored: dict[int, SimilarAddon], snapshot: date | None) -> None:
         topics = set(target.github.topics) - {"anki", "anki-addon", "anki-add-on", "addon"} if target.github else set()

@@ -7,6 +7,7 @@ from anki_addons_mcp.domain.models import (
     AiInfo,
     AnkiWebInfo,
     AnkiWebLink,
+    AuthorInfo,
     Branch,
     ForumInfo,
     GithubInfo,
@@ -20,7 +21,7 @@ CARD_COLUMNS = [
     "id", "title", "url", "rating", "likes", "dislikes", "update_date", "anki_version", "anki_point_version",
     "anki_version_kind", "ai_summary",
     "github_user", "github_repo", "github_stars", "github_last_commit", "github_archived", "github_license",
-    "forum_posts_count", "ai_tags",
+    "forum_posts_count", "ai_tags", "author_id",
 ]
 
 
@@ -51,7 +52,7 @@ def row_to_card(row: dict[str, Any], score: float | None = None) -> AddonCard:
         github_user=row["github_user"], github_repo=row["github_repo"], github_stars=row["github_stars"],
         github_last_commit=row["github_last_commit"], github_archived=row["github_archived"],
         license=row["github_license"], forum_posts_count=row["forum_posts_count"], ai_tags=_list(row["ai_tags"]),
-        score=score,
+        author_id=row["author_id"], score=score,
     )
 
 
@@ -72,6 +73,8 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
         ai_declaration_markers=_list(row["ai_declaration_markers"]),
         description_language=row["description_language"],
         description_language_confidence=row["description_language_confidence"],
+        description_pre_wrap=bool(row["description_pre_wrap"]),
+        other_items_count=row["other_items_count"],
     )
     github = None
     if row["has_github"]:
@@ -113,4 +116,7 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
     tags = _list(row["ai_tags"])
     has_ai = row["ai_summary"] or row["ai_model"] or tags
     ai = AiInfo(summary=row["ai_summary"], model=row["ai_model"], tags=tags) if has_ai else None
-    return AddonDetails(id=row["id"], anki_web=anki_web, github=github, forum=forum, ai=ai)
+    author = None
+    if row["author_id"] is not None:
+        author = AuthorInfo(id=row["author_id"], addon_count=row["author_addon_count"] or 0)
+    return AddonDetails(id=row["id"], anki_web=anki_web, github=github, forum=forum, ai=ai, author=author)

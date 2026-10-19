@@ -28,6 +28,7 @@ class AddonFilters(BaseModel):
     language: str | None = None
     description_language: str | None = None
     github_user: str | None = None
+    author_id: int | None = None
     updated_after: date | None = None
     updated_before: date | None = None
     archived: bool | None = None

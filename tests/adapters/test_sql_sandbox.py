@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 
 from anki_addons_mcp.adapters.hf_parquet.repository import DuckDbAddonRepository
@@ -34,6 +36,15 @@ def test_tags_table(duckdb_repository: DuckDbAddonRepository) -> None:
     assert result.rows == [["function", 11], ["status", 3]]
     helpers = duckdb_repository.execute_readonly("SELECT * FROM addons LIMIT 1", OLD, 10, 5)
     assert "tags_text" not in helpers.columns and "ai_tags" in helpers.columns
+
+
+@pytest.mark.parametrize(("snapshot", "expected"), [(None, [6, 8, 1]), (OLD, [0, 8, 2])])
+def test_dataset_2_4_columns(duckdb_repository: DuckDbAddonRepository, snapshot: date | None,
+                             expected: list[int]) -> None:
+    result = duckdb_repository.execute_readonly(
+        "SELECT count(DISTINCT author_id), count(description_html), count_if(description_pre_wrap) FROM addons",
+        snapshot, 10, 5)
+    assert result.rows == [expected]
 
 
 def test_row_cap(duckdb_repository: DuckDbAddonRepository) -> None:

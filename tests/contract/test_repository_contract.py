@@ -9,6 +9,7 @@ from anki_addons_mcp.domain.models import NONE_GROUP, GroupField, TextKind, Vers
 from anki_addons_mcp.domain.ports import AddonRepository
 from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, SortField
 from tests.fixtures.dataset import (
+    ALICE_ADDONS,
     HEATMAP,
     KANJI,
     LATEST,
@@ -80,6 +81,38 @@ def test_get_addons_keeps_order_and_skips_missing(repository: AddonRepository) -
     assert [d.id for d in repository.get_addons([HEATMAP, 424242, KANJI, HEATMAP])] == [HEATMAP, KANJI]
 
 
+def test_author_in_details(repository: AddonRepository) -> None:
+    details = repository.get_addon(SAME_AUTHOR)
+    assert details is not None and details.author is not None
+    assert (details.author.id, details.author.addon_count) == (KANJI, 3)
+
+
+def test_author_on_cards(repository: AddonRepository) -> None:
+    card = repository.find(AddonQuery(filters=AddonFilters(addon_ids=[NO_GITHUB]))).items[0]
+    assert card.author_id == KANJI
+
+
+def test_author_missing_in_snapshot_without_authors(repository: AddonRepository) -> None:
+    details = repository.get_addon(KANJI, OLD)
+    assert details is not None and details.author is None
+
+
+def test_author_filter_in_snapshot_without_authors(repository: AddonRepository) -> None:
+    assert ids(repository, AddonQuery(filters=AddonFilters(author_id=KANJI)), OLD) == []
+
+
+def test_description_details(repository: AddonRepository) -> None:
+    details = repository.get_addon(LEGACY)
+    assert details is not None
+    assert (details.anki_web.description_pre_wrap, details.anki_web.other_items_count) == (True, 0)
+    assert details.description_html is None
+
+
+def test_get_text_html(repository: AddonRepository) -> None:
+    assert repository.get_text(KANJI, TextKind.DESCRIPTION_HTML) == (
+        "<p>Look up kanji stroke order and readings while reviewing japanese vocabulary.</p>")
+
+
 def test_get_text(repository: AddonRepository) -> None:
     assert repository.get_text(KANJI, TextKind.README) == "# Kanji Helper\nStroke order for kanji."
     assert "stroke order" in (repository.get_text(KANJI, TextKind.DESCRIPTION) or "")
@@ -128,6 +161,7 @@ def test_find_text_no_match(repository: AddonRepository) -> None:
     (AddonFilters(language="javascript"), {OCCLUSION}),
     (AddonFilters(description_language="DE"), {NO_GITHUB}),
     (AddonFilters(github_user="alice"), {KANJI, SAME_AUTHOR}),
+    (AddonFilters(author_id=KANJI), set(ALICE_ADDONS)),
     (AddonFilters(updated_after=date(2026, 9, 1)), {KANJI, VIBE, NEW_ADDON}),
     (AddonFilters(updated_before=date(2020, 1, 1)), {LEGACY}),
     (AddonFilters(archived=True), {LEGACY}),
@@ -221,6 +255,11 @@ def test_aggregation(repository: AddonRepository) -> None:
     assert aggregation.addon_with_anki_forum_page_number == 2
     assert aggregation.addon_with_unit_tests_number == 2
     assert repository.get_aggregation(OLD).addon_number == 8
+
+
+@pytest.mark.parametrize(("snapshot", "authors"), [(LATEST, 6), (OLD, 0)])
+def test_aggregation_author_number(repository: AddonRepository, snapshot: date, authors: int) -> None:
+    assert repository.get_aggregation(snapshot).author_number == authors
 
 
 def test_group_counts(repository: AddonRepository) -> None:

@@ -98,7 +98,9 @@ def register_prompts(mcp: MCPServer, services: Services) -> None:
     def author_portfolio(github_user: str) -> str:
         return (
             f"Summarize the Anki addons published by GitHub user {github_user}.\n\n"
-            "1. list_addons_by_author.\n2. assess_maintenance for each (up to 15).\n"
+            "1. list_addons_by_author with github_user; also call it with addon_id of one of the addons to "
+            "include the author's addons without a GitHub repository (when the snapshot has author data).\n"
+            "2. assess_maintenance for each (up to 15).\n"
             "3. Report: what the author builds, reception (likes/dislikes, stars), upkeep, and the standout "
             "addons.\n\n" + AI_NOTE
         )

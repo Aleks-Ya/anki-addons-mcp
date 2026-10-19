@@ -84,9 +84,24 @@ class CatalogService:
             filters.tags = [tag]
         return self.filter(filters, _TOP_SORT[metric], True, limit, 0, snapshot)
 
-    def by_author(self, github_user: str, snapshot: date | None = None) -> Page[AddonCard]:
-        query = AddonQuery(filters=AddonFilters(github_user=github_user), sort=SortField.RATING, limit=None)
-        return self._repository.find(query, snapshot)
+    def by_author(self, github_user: str | None = None, snapshot: date | None = None, author_id: int | None = None,
+                  addon_id: int | None = None) -> Page[AddonCard]:
+        given = [v for v in (github_user, author_id, addon_id) if v is not None]
+        if len(given) != 1:
+            raise InvalidQuery("Give exactly one of github_user, author_id or addon_id")
+        if addon_id is not None:
+            author_id = self._author_of(addon_id, snapshot)
+        filters = AddonFilters(github_user=github_user, author_id=author_id)
+        return self._repository.find(AddonQuery(filters=filters, sort=SortField.RATING, limit=None), snapshot)
+
+    def _author_of(self, addon_id: int, snapshot: date | None) -> int:
+        details = self._repository.get_addon(addon_id, snapshot)
+        if details is None:
+            raise AddonNotFound(addon_id, snapshot)
+        if details.author is None:
+            raise InvalidQuery(f"Addon {addon_id} has no AnkiWeb author data in this snapshot "
+                               "(snapshots collected before authors were tracked have none); try github_user")
+        return details.author.id
 
     def by_tag(self, tag: str, snapshot: date | None = None) -> Page[AddonCard]:
         filters = AddonFilters(tags=[tag])

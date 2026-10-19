@@ -8,6 +8,9 @@ from pydantic import BaseModel, BeforeValidator, Field, computed_field, field_va
 AI_PROVENANCE = "LLM-generated summary and tags; may contain mistakes. Verify against the description or README."
 APPROVAL_DESCRIPTION = ("Share of likes among AnkiWeb votes, as the 95% Wilson lower bound (0..1): "
                         "dislikes and few votes lower it. Ranking by 'rating' sorts by this value.")
+AUTHOR_ID_DESCRIPTION = ("Derived AnkiWeb author: the smallest addon id among the addons the author shared. "
+                         "An anonymous label, not an AnkiWeb id; null in snapshots collected before authors "
+                         "were tracked.")
 _Z = 1.96
 
 
@@ -62,6 +65,9 @@ class AnkiWebInfo(BaseModel):
     ai_declaration_markers: list[str] = Field(default_factory=list)
     description_language: str | None = None
     description_language_confidence: float | None = None
+    description_pre_wrap: bool = False
+    other_items_count: int | None = Field(
+        default=None, description="Other items the author shared on AnkiWeb, shared decks included")
 
     @field_validator("update_date", "anki_version", "contact_author_url", "description_language", mode="before")
     @classmethod
@@ -144,17 +150,24 @@ class AiInfo(BaseModel):
         return AI_PROVENANCE
 
 
+class AuthorInfo(BaseModel):
+    id: int = Field(description=AUTHOR_ID_DESCRIPTION)
+    addon_count: int = Field(description="Number of the author's addons in the snapshot")
+
+
 class AddonDetails(BaseModel):
     id: int
     anki_web: AnkiWebInfo
     github: GithubInfo | None = None
     forum: ForumInfo | None = None
     ai: AiInfo | None = None
+    author: AuthorInfo | None = None
     description: str | None = None
+    description_html: str | None = None
     readme: str | None = None
 
     def without_texts(self) -> "AddonDetails":
-        return self.model_copy(update={"description": None, "readme": None})
+        return self.model_copy(update={"description": None, "description_html": None, "readme": None})
 
 
 class AddonCard(BaseModel):
@@ -177,6 +190,7 @@ class AddonCard(BaseModel):
     license: str | None = None
     forum_posts_count: int | None = None
     ai_tags: list[str] = Field(default_factory=list, description=AI_PROVENANCE)
+    author_id: int | None = Field(default=None, description=AUTHOR_ID_DESCRIPTION)
     score: float | None = None
 
     @computed_field(description=APPROVAL_DESCRIPTION)
@@ -206,6 +220,7 @@ class AddonCard(BaseModel):
             license=github.license if github else None,
             forum_posts_count=details.forum.posts_count if details.forum else None,
             ai_tags=list(details.ai.tags) if details.ai else [],
+            author_id=details.author.id if details.author else None,
             score=score,
         )
 
@@ -235,6 +250,7 @@ class Aggregation(BaseModel):
     addon_with_github_number: int
     addon_with_anki_forum_page_number: int
     addon_with_unit_tests_number: int
+    author_number: int
 
 
 class AddonHistoryPoint(BaseModel):
@@ -252,6 +268,7 @@ class AddonHistoryPoint(BaseModel):
 
 class TextKind(StrEnum):
     DESCRIPTION = "description"
+    DESCRIPTION_HTML = "description_html"
     README = "readme"
 
 

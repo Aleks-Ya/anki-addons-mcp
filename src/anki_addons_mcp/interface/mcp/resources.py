@@ -118,6 +118,15 @@ def register_resources(mcp: MCPServer, services: Services) -> None:
             raise ResourceNotFoundError(f"Addon {addon_id} has no description")
         return text
 
+    @mcp.resource("anki-addons://addons/{addon_id}/description.html", mime_type="text/html",
+                  description="AnkiWeb description of an addon as the author's HTML (not sanitized)")
+    def addon_description_html(addon_id: str) -> str:
+        with resource_errors():
+            text = catalog.text(parse_addon_id(addon_id), TextKind.DESCRIPTION_HTML).text
+        if text is None:
+            raise ResourceNotFoundError(f"Addon {addon_id} has no HTML description")
+        return text
+
     @mcp.resource("anki-addons://addons/{addon_id}/history", mime_type=JSON,
                   description="Rating, likes and stars of an addon across snapshots")
     def addon_history(addon_id: str) -> str:

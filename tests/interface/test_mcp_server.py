@@ -8,7 +8,7 @@ from mcp import Client
 from anki_addons_mcp.application.services import build_services
 from anki_addons_mcp.domain.ports import AddonRepository
 from anki_addons_mcp.interface.mcp.server import build_server
-from tests.fixtures.dataset import HEATMAP, KANJI, NEW_ADDON, OCCLUSION, OLD
+from tests.fixtures.dataset import HEATMAP, KANJI, NEW_ADDON, NO_GITHUB, OCCLUSION, OLD
 
 pytestmark = pytest.mark.anyio
 
@@ -54,7 +54,7 @@ async def test_lists_prompts_and_resources(client: Client) -> None:
     templates = {t.uri_template for t in (await client.list_resource_templates()).resource_templates}
     assert "anki-addons://addons/{addon_id}" in templates
     assert "anki-addons://tags/{tag}" in templates
-    assert len(templates) == 8
+    assert len(templates) == 9
 
 
 async def test_search(client: Client) -> None:
@@ -160,6 +160,31 @@ async def test_statistics_top_similar_author(client: Client) -> None:
     assert similar["result"][0]["card"]["id"] == NEW_ADDON
     author = await call(client, "list_addons_by_author", github_user="alice")
     assert author["total"] == 2
+
+
+async def test_list_addons_by_ankiweb_author(client: Client) -> None:
+    author = await call(client, "list_addons_by_author", addon_id=KANJI)
+    assert author["total"] == 3
+
+
+async def test_list_addons_by_author_needs_a_key(client: Client) -> None:
+    result = await client.call_tool("list_addons_by_author", {})
+    assert result.is_error
+
+
+async def test_filter_by_author_id(client: Client) -> None:
+    page = await call(client, "filter_addons", author_id=KANJI, has_github=False)
+    assert [item["id"] for item in page["items"]] == [NO_GITHUB]
+
+
+async def test_description_as_html(client: Client) -> None:
+    text = await call(client, "get_addon_description", addon_id=KANJI, format="html")
+    assert text["text"].startswith("<p>Look up kanji")
+
+
+async def test_description_html_resource(client: Client) -> None:
+    html = (await client.read_resource(f"anki-addons://addons/{KANJI}/description.html")).contents[0].text  # type: ignore[union-attr]
+    assert html.startswith("<p>")
 
 
 async def test_query_sql_when_available(client: Client, repository: AddonRepository) -> None:
