@@ -12,7 +12,7 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("title", "anki_web.title", "VARCHAR"),
     ("url", "anki_web.addon_page_url", "VARCHAR, AnkiWeb page"),
     ("contact_author_url", "anki_web.contact_author_url", "VARCHAR"),
-    ("rating", "anki_web.rating", "BIGINT, AnkiWeb rating"),
+    ("rating", "anki_web.rating", "BIGINT, AnkiWeb total votes (likes + dislikes), not a quality score"),
     ("likes", "anki_web.likes", "BIGINT"),
     ("dislikes", "anki_web.dislikes", "BIGINT"),
     ("update_date", "anki_web.update_date", "VARCHAR, YYYY-MM-DD of the last AnkiWeb upload"),

@@ -19,6 +19,7 @@ from anki_addons_mcp.domain.models import (
     SnapshotInfo,
     Tag,
     TextKind,
+    approval_score,
 )
 from anki_addons_mcp.domain.ports import AddonRepository
 from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, SortField
@@ -118,7 +119,7 @@ def _sort_value(d: AddonDetails, field: SortField, score: float | None) -> Any:
         case SortField.RELEVANCE:
             return score
         case SortField.RATING:
-            return d.anki_web.rating
+            return approval_score(d.anki_web.likes, d.anki_web.dislikes)
         case SortField.LIKES:
             return d.anki_web.likes
         case SortField.STARS:

@@ -146,7 +146,7 @@ async def test_history_diff_and_snapshots(client: Client) -> None:
     snapshots = await call(client, "list_snapshots")
     assert [s["date"] for s in snapshots["result"]] == [OLD.isoformat(), "2026-10-01"]
     history = await call(client, "get_addon_history", addon_id=KANJI)
-    assert [p["rating"] for p in history["points"]] == [100, 120]
+    assert [p["rating"] for p in history["points"]] == [100, 130]
     diff = await call(client, "diff_snapshots")
     assert diff["added_count"] == 1 and diff["removed_count"] == 1
 

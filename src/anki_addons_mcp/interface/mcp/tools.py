@@ -85,8 +85,9 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Structured addon query. All filters are optional and combined with AND. "
-        "Returns addon cards and the total number of matches. sort_by=anki_version orders by the newest "
-        "supported Anki version."))
+        "Returns addon cards and the total number of matches. sort_by=rating (default) ranks by approval: "
+        "the Wilson lower bound of likes vs. dislikes, so disliked addons rank lower. min_rating is a minimum "
+        "number of AnkiWeb votes (likes + dislikes). sort_by=anki_version orders by the newest supported Anki version."))
     def filter_addons(
         min_rating: int | None = None, min_likes: int | None = None, min_stars: int | None = None,  # NOSONAR - flat MCP tool parameters
         has_github: bool | None = None, has_tests: bool | None = None, has_forum: bool | None = None,
@@ -186,7 +187,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
             return services.stats.statistics(parse_snapshot(snapshot), group_by, top_values)
 
     @mcp.tool(annotations=READ_ONLY, description=(
-        "Leaderboard of addons by rating, likes, stars, forum posts or recency, optionally within one AI tag."))
+        "Leaderboard of addons by rating, likes, stars, forum posts or recency, optionally within one AI tag. "
+        "metric=rating ranks by approval (Wilson lower bound of likes vs. dislikes)."))
     def top_addons(metric: TopMetric = TopMetric.RATING, limit: Limit = 10,
                    tag: Annotated[str | None, Field(description="Only addons with this AI tag, e.g. 'fsrs'")] = None,
                    snapshot: Snapshot = "latest") -> Page[AddonCard]:

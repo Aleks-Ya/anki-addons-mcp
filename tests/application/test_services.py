@@ -7,7 +7,7 @@ from anki_addons_mcp.application.services import Services, build_services
 from anki_addons_mcp.application.snapshots import parse_snapshot
 from anki_addons_mcp.domain.compatibility import Support
 from anki_addons_mcp.domain.errors import AddonNotFound, InvalidQuery, SnapshotNotFound
-from anki_addons_mcp.domain.models import GroupField, TextKind, VersionKind
+from anki_addons_mcp.domain.models import GroupField, TextKind, VersionKind, approval_score
 from anki_addons_mcp.domain.query import AddonFilters
 from tests.fixtures.dataset import (
     HEATMAP,
@@ -35,6 +35,12 @@ def test_parse_snapshot() -> None:
     assert parse_snapshot("2026-09-01") == OLD
     with pytest.raises(InvalidQuery):
         parse_snapshot("last month")
+
+
+def test_approval_score() -> None:
+    assert approval_score(0, 0) == 0
+    assert approval_score(10, 0) < approval_score(100, 0) < 1
+    assert approval_score(200, 150) < approval_score(200, 10) < approval_score(200, 0)
 
 
 def test_snapshot_service(services: Services) -> None:
@@ -138,7 +144,7 @@ def test_diff(services: Services) -> None:
     assert [c.id for c in diff.added] == [NEW_ADDON]
     assert [c.id for c in diff.removed] == [REMOVED]
     assert [c.id for c in diff.updated] == [KANJI]
-    assert diff.rating_movers[0].id == KANJI and diff.rating_movers[0].rating_delta == 20
+    assert diff.rating_movers[0].id == KANJI and diff.rating_movers[0].rating_delta == 30
     assert [(c.id, c.stars_delta) for c in diff.star_movers] == [(OCCLUSION, 50), (KANJI, 10)]
 
 

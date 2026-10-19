@@ -88,8 +88,14 @@ def test_get_text(repository: AddonRepository) -> None:
 
 def test_find_default_sort_is_rating(repository: AddonRepository) -> None:
     page = repository.find(AddonQuery(limit=3))
-    assert [c.id for c in page.items] == [OCCLUSION, KANJI, HEATMAP]
+    assert [c.id for c in page.items] == [OCCLUSION, HEATMAP, KANJI]
     assert page.total == 8
+
+
+def test_rating_sort_ranks_disliked_addons_low(repository: AddonRepository) -> None:
+    ranked = ids(repository, AddonQuery(sort=SortField.RATING, limit=None))
+    assert repository.get_addon(LEGACY).anki_web.rating == 350
+    assert ranked.index(LEGACY) > ranked.index(NEW_ADDON)
 
 
 def test_find_paging(repository: AddonRepository) -> None:
@@ -114,7 +120,7 @@ def test_find_text_no_match(repository: AddonRepository) -> None:
 
 
 @pytest.mark.parametrize(("filters", "expected"), [
-    (AddonFilters(min_rating=80), {OCCLUSION, KANJI, HEATMAP}),
+    (AddonFilters(min_rating=80), {OCCLUSION, KANJI, HEATMAP, LEGACY}),
     (AddonFilters(min_stars=100), {OCCLUSION, HEATMAP}),
     (AddonFilters(has_github=False), {NO_GITHUB}),
     (AddonFilters(has_tests=True), {KANJI, OCCLUSION}),
@@ -135,7 +141,7 @@ def test_find_text_no_match(repository: AddonRepository) -> None:
     (AddonFilters(anki_version_kind=VersionKind.UNKNOWN), {NO_GITHUB}),
     (AddonFilters(anki_version_at_least="25.02"), {KANJI, VIBE, NEW_ADDON}),
     (AddonFilters(addon_ids=[KANJI, LEGACY, 424242]), {KANJI, LEGACY}),
-    (AddonFilters(has_github=True, min_rating=50, has_tests=False), {HEATMAP}),
+    (AddonFilters(has_github=True, min_rating=50, has_tests=False), {HEATMAP, LEGACY}),
 ])
 def test_find_filters(repository: AddonRepository, filters: AddonFilters, expected: set[int]) -> None:
     page = repository.find(AddonQuery(filters=filters, limit=None))
@@ -200,7 +206,7 @@ def test_invalid_anki_version_filter(repository: AddonRepository) -> None:
 
 def test_history(repository: AddonRepository) -> None:
     points = repository.get_history(KANJI)
-    assert [(p.snapshot, p.rating, p.github_stars) for p in points] == [(OLD, 100, 40), (LATEST, 120, 50)]
+    assert [(p.snapshot, p.rating, p.github_stars) for p in points] == [(OLD, 100, 40), (LATEST, 130, 50)]
     added = repository.get_history(NEW_ADDON)
     assert [p.present for p in added] == [False, True]
     assert [p.snapshot for p in repository.get_history(KANJI, from_=LATEST)] == [LATEST]

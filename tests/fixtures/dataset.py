@@ -128,7 +128,7 @@ def forum(topic_id: int, posts: int) -> dict[str, Any]:
 
 def latest_records() -> list[dict[str, Any]]:
     return [
-        addon(KANJI, "Kanji Helper", rating=120, likes=125, dislikes=5, update_date="2026-09-20",
+        addon(KANJI, "Kanji Helper", rating=130, likes=125, dislikes=5, update_date="2026-09-20",
               anki_version="25.02~", branches=[("2.1.0", "2.1.49"), ("25.02", "+")],
               description="Look up kanji stroke order and readings while reviewing japanese vocabulary.",
               ai_summary="Shows kanji stroke order and readings during review.",
@@ -136,7 +136,7 @@ def latest_records() -> list[dict[str, Any]]:
               github=github("alice", "kanji-helper", stars=50, tests=12, actions=2, topics=["japanese", "kanji"],
                             manifest=_manifest(231000, None), readme="# Kanji Helper\nStroke order for kanji."),
               forum=forum(11, 30)),
-        addon(OCCLUSION, "Image Occlusion Plus", rating=300, likes=310, dislikes=10, update_date="2026-08-01",
+        addon(OCCLUSION, "Image Occlusion Plus", rating=320, likes=310, dislikes=10, update_date="2026-08-01",
               anki_version="2.1.66~", branches=[("2.1.66", "25.09+")],
               description="Hide parts of an image to create occlusion cards for anatomy.",
               ai_summary="Creates image occlusion cards.", ai_tags=["image-occlusion", "card-creation"],
@@ -144,13 +144,13 @@ def latest_records() -> list[dict[str, Any]]:
                             languages=["Python", "JavaScript"], topics=["image", "occlusion"],
                             manifest=_manifest(66, -250900), readme="# Image Occlusion\nOcclude images."),
               forum=forum(22, 120)),
-        addon(HEATMAP, "Review Heatmap", rating=80, likes=82, dislikes=2, update_date="2024-01-10",
+        addon(HEATMAP, "Review Heatmap", rating=84, likes=82, dislikes=2, update_date="2024-01-10",
               anki_version="<=2.1.54", branches=[("2.1.20", "2.1.54")],
               description="Heatmap of review history with streak counter.",
               ai_tags=["statistics", "progress-tracking"],
               github=github("carol", "review-heatmap", stars=200, last_commit="2023-12-01T00:00:00",
                             tests=None, license="AGPL-3.0", topics=["heatmap"])),
-        addon(LEGACY, "Legacy Scheduler", rating=5, likes=6, dislikes=1, update_date="2019-05-01",
+        addon(LEGACY, "Legacy Scheduler", rating=350, likes=200, dislikes=150, update_date="2019-05-01",
               anki_version="2.1.0~", branches=[("2.1.0", None)], description="Old scheduler tweaks.",
               ai_tags=["scheduling", "obsolete"],
               github=github("dave", "legacy", stars=3, last_commit="2019-04-01T00:00:00", archived=True,
@@ -158,7 +158,7 @@ def latest_records() -> list[dict[str, Any]]:
         addon(NO_GITHUB, "Simple Timer", rating=15, likes=15, update_date="2025-11-11", anki_version="",
               branches=[("2.1.50", "+")], description="A timer for review sessions. Zeitmesser.", lang="de",
               ai_tags=["timer"]),
-        addon(VIBE, "Vibe Deck Tools", rating=2, likes=3, dislikes=1, update_date="2026-09-29",
+        addon(VIBE, "Vibe Deck Tools", rating=4, likes=3, dislikes=1, update_date="2026-09-29",
               anki_version="25.09~", branches=[("25.09", "+")], description="Deck tools vibe-coded with claude.",
               ai_declaration=["claude", "vibe-coded"], ai_tags=["deck-management", "beta"],
               github=github("erin", "vibe-deck", stars=1, last_commit="2026-09-28T12:00:00", license="MIT",
@@ -167,7 +167,7 @@ def latest_records() -> list[dict[str, Any]]:
               branches=[("25.02", "+")], description="Quiz yourself on kanji meanings.",
               ai_summary="Kanji meaning quiz.", ai_tags=["quiz", "dictionary"],
               github=github("frank", "kanji-quiz", stars=5, topics=["kanji", "quiz"])),
-        addon(SAME_AUTHOR, "Alice Utilities", rating=40, likes=41, dislikes=1, update_date="2026-05-05",
+        addon(SAME_AUTHOR, "Alice Utilities", rating=42, likes=41, dislikes=1, update_date="2026-05-05",
               anki_version="23.10~", branches=[("23.10", "+")], description="Assorted utilities.",
               github=github("Alice", "alice-utils", stars=20, topics=["utilities"])),
     ]
@@ -176,7 +176,7 @@ def latest_records() -> list[dict[str, Any]]:
 def old_records() -> list[dict[str, Any]]:
     by_id = {r["id"]: json.loads(json.dumps(r)) for r in latest_records()}
     del by_id[NEW_ADDON]
-    by_id[KANJI]["anki_web"]["rating"] = 100
+    by_id[KANJI]["anki_web"].update(rating=100, likes=95, dislikes=5)
     by_id[KANJI]["anki_web"]["update_date"] = "2026-06-01"
     by_id[KANJI]["github"]["stars"] = 40
     by_id[OCCLUSION]["github"]["stars"] = 450

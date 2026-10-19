@@ -28,7 +28,7 @@ def register_prompts(mcp: MCPServer, services: Services) -> None:
             "not enough to judge.\n"
             f"{compat}"
             "4. Call assess_maintenance for the candidates.\n"
-            "5. Recommend 3-5 addons. For each: what it does, why it fits, rating/likes, compatibility, "
+            "5. Recommend 3-5 addons. For each: what it does, why it fits, likes/dislikes, compatibility, "
             "maintenance label, and the AnkiWeb link. Mention trade-offs and warn about stale or "
             f"incompatible ones. {WARN_TAGS}\n\n" + AI_NOTE
         )
@@ -39,7 +39,7 @@ def register_prompts(mcp: MCPServer, services: Services) -> None:
             f"Compare these Anki addons: {addon_ids} (comma-separated AnkiWeb ids).\n\n"
             "For each, call get_addon (include=['description']) and assess_maintenance; call "
             "get_addon_readme when the description is thin.\n"
-            "Produce a markdown table with columns: addon, main features, rating (likes/dislikes), "
+            "Produce a markdown table with columns: addon, main features, likes/dislikes, "
             "supported Anki versions, maintenance label, license, GitHub stars. Then summarize which one "
             "suits which kind of user.\n\n" + AI_NOTE
         )
@@ -99,7 +99,7 @@ def register_prompts(mcp: MCPServer, services: Services) -> None:
         return (
             f"Summarize the Anki addons published by GitHub user {github_user}.\n\n"
             "1. list_addons_by_author.\n2. assess_maintenance for each (up to 15).\n"
-            "3. Report: what the author builds, reception (rating, likes, stars), upkeep, and the standout "
+            "3. Report: what the author builds, reception (likes/dislikes, stars), upkeep, and the standout "
             "addons.\n\n" + AI_NOTE
         )
 
@@ -115,7 +115,7 @@ def register_prompts(mcp: MCPServer, services: Services) -> None:
             "also call top_addons with tag and metric=stars.\n"
             "3. Call assess_maintenance for the top 8 candidates.\n"
             f"{compat}"
-            "5. Recommend 3-5 addons, each with what it does, rating/likes, maintenance label and the AnkiWeb "
+            "5. Recommend 3-5 addons, each with what it does, likes/dislikes, maintenance label and the AnkiWeb "
             f"link. {WARN_TAGS}\n\n" + AI_NOTE
         )
 

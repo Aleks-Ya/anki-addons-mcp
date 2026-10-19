@@ -1,3 +1,4 @@
+import math
 from datetime import date, datetime
 from enum import StrEnum
 from typing import Annotated, Any
@@ -5,6 +6,18 @@ from typing import Annotated, Any
 from pydantic import BaseModel, BeforeValidator, Field, computed_field, field_validator
 
 AI_PROVENANCE = "LLM-generated summary and tags; may contain mistakes. Verify against the description or README."
+APPROVAL_DESCRIPTION = ("Share of likes among AnkiWeb votes, as the 95% Wilson lower bound (0..1): "
+                        "dislikes and few votes lower it. Ranking by 'rating' sorts by this value.")
+_Z = 1.96
+
+
+def approval_score(likes: int, dislikes: int) -> float:
+    """95% Wilson score lower bound of the like ratio; 0 without votes."""
+    n = likes + dislikes
+    if n <= 0:
+        return 0.0
+    p = likes / n
+    return (p + _Z * _Z / (2 * n) - _Z * math.sqrt(p * (1 - p) / n + _Z * _Z / (4 * n * n))) / (1 + _Z * _Z / n)
 
 
 class VersionKind(StrEnum):
@@ -165,6 +178,10 @@ class AddonCard(BaseModel):
     forum_posts_count: int | None = None
     ai_tags: list[str] = Field(default_factory=list, description=AI_PROVENANCE)
     score: float | None = None
+
+    @computed_field(description=APPROVAL_DESCRIPTION)
+    def approval(self) -> float:
+        return round(approval_score(self.likes, self.dislikes), 4)
 
     @classmethod
     def from_details(cls, details: AddonDetails, score: float | None = None) -> "AddonCard":

@@ -45,9 +45,15 @@ _PARALLEL_DOWNLOADS = 4
 
 _DETAIL_COLUMNS = [name for name, _, _ in FLAT_COLUMNS if name not in ("description", "github_readme")]
 
+# 95% Wilson lower bound of likes among votes; mirrors domain.models.approval_score.
+_APPROVAL = ("(CASE WHEN coalesce(likes, 0) + coalesce(dislikes, 0) = 0 THEN 0.0 ELSE "
+             "(coalesce(likes, 0) + 1.9208 - 1.96 * sqrt(coalesce(likes, 0) * coalesce(dislikes, 0) "
+             "/ (coalesce(likes, 0) + coalesce(dislikes, 0)) + 0.9604)) "
+             "/ (coalesce(likes, 0) + coalesce(dislikes, 0) + 3.8416) END)")
+
 _SORT_EXPR = {
     SortField.RELEVANCE: "score",
-    SortField.RATING: "rating",
+    SortField.RATING: _APPROVAL,
     SortField.LIKES: "likes",
     SortField.STARS: "github_stars",
     SortField.UPDATE_DATE: "NULLIF(update_date, '')",
