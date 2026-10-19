@@ -144,7 +144,8 @@ def test_diff(services: Services) -> None:
     assert [c.id for c in diff.added] == [NEW_ADDON]
     assert [c.id for c in diff.removed] == [REMOVED]
     assert [c.id for c in diff.updated] == [KANJI]
-    assert diff.rating_movers[0].id == KANJI and diff.rating_movers[0].rating_delta == 30
+    assert diff.rating_movers[0].id == KANJI
+    assert diff.rating_movers[0].rating_delta == 30
     assert [(c.id, c.stars_delta) for c in diff.star_movers] == [(OCCLUSION, 50), (KANJI, 10)]
 
 
