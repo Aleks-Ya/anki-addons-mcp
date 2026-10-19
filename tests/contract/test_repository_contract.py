@@ -83,7 +83,8 @@ def test_get_addons_keeps_order_and_skips_missing(repository: AddonRepository) -
 
 def test_author_in_details(repository: AddonRepository) -> None:
     details = repository.get_addon(SAME_AUTHOR)
-    assert details is not None and details.author is not None
+    assert details is not None
+    assert details.author is not None
     assert (details.author.id, details.author.addon_count) == (KANJI, 3)
 
 
@@ -94,7 +95,8 @@ def test_author_on_cards(repository: AddonRepository) -> None:
 
 def test_author_missing_in_snapshot_without_authors(repository: AddonRepository) -> None:
     details = repository.get_addon(KANJI, OLD)
-    assert details is not None and details.author is None
+    assert details is not None
+    assert details.author is None
 
 
 def test_author_filter_in_snapshot_without_authors(repository: AddonRepository) -> None:

@@ -56,6 +56,12 @@ def row_to_card(row: dict[str, Any], score: float | None = None) -> AddonCard:
     )
 
 
+def _author(row: dict[str, Any]) -> AuthorInfo | None:
+    if row["author_id"] is None:
+        return None
+    return AuthorInfo(id=row["author_id"], addon_count=row["author_addon_count"] or 0)
+
+
 def row_to_details(row: dict[str, Any]) -> AddonDetails:
     anki_web = AnkiWebInfo(
         title=row["title"] or "",
@@ -116,7 +122,4 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
     tags = _list(row["ai_tags"])
     has_ai = row["ai_summary"] or row["ai_model"] or tags
     ai = AiInfo(summary=row["ai_summary"], model=row["ai_model"], tags=tags) if has_ai else None
-    author = None
-    if row["author_id"] is not None:
-        author = AuthorInfo(id=row["author_id"], addon_count=row["author_addon_count"] or 0)
-    return AddonDetails(id=row["id"], anki_web=anki_web, github=github, forum=forum, ai=ai, author=author)
+    return AddonDetails(id=row["id"], anki_web=anki_web, github=github, forum=forum, ai=ai, author=_author(row))
