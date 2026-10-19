@@ -46,25 +46,8 @@ class SimilarityService:
     def similar(self, addon_id: int, limit: int = 10, snapshot: date | None = None) -> list[SimilarAddon]:
         check_limit(limit)
         target = self._catalog.get(addon_id, snapshot)
-        terms = _terms(target)
-        scored: dict[int, SimilarAddon] = {}
-        if terms:
-            pool = self._repository.find(
-                AddonQuery(text=" ".join(terms), sort=SortField.RELEVANCE, limit=limit * 4), snapshot).items
-            for rank, card in enumerate(pool):
-                if card.id != addon_id:
-                    scored[card.id] = SimilarAddon(card=card, score=1.0 - rank / len(pool),
-                                                   reasons=["similar wording in title/summary/topics"])
-        author = target.github.user if target.github else None
-        if author:
-            same_author = self._repository.find(
-                AddonQuery(filters=AddonFilters(github_user=author), limit=limit), snapshot).items
-            for card in same_author:
-                if card.id == addon_id:
-                    continue
-                entry = scored.setdefault(card.id, SimilarAddon(card=card, score=0.0, reasons=[]))
-                entry.score += 0.5
-                entry.reasons.append(f"same author ({author})")
+        scored = self._wording_matches(target, limit, snapshot)
+        self._add_same_author(target, scored, limit, snapshot)
         self._add_topic_overlap(target, scored, snapshot)
         self._add_tag_overlap(target, scored, snapshot)
         # Addons nobody has voted on yet are untested, so they go after every voted one.
@@ -74,6 +57,30 @@ class SimilarityService:
             if _unvoted(entry.card):
                 entry.reasons.append("no AnkiWeb votes yet")
         return ranked
+
+    def _wording_matches(self, target: AddonDetails, limit: int, snapshot: date | None) -> dict[int, SimilarAddon]:
+        terms = _terms(target)
+        if not terms:
+            return {}
+        pool = self._repository.find(
+            AddonQuery(text=" ".join(terms), sort=SortField.RELEVANCE, limit=limit * 4), snapshot).items
+        return {card.id: SimilarAddon(card=card, score=1.0 - rank / len(pool),
+                                      reasons=["similar wording in title/summary/topics"])
+                for rank, card in enumerate(pool) if card.id != target.id}
+
+    def _add_same_author(self, target: AddonDetails, scored: dict[int, SimilarAddon], limit: int,
+                         snapshot: date | None) -> None:
+        author = target.github.user if target.github else None
+        if not author:
+            return
+        same_author = self._repository.find(
+            AddonQuery(filters=AddonFilters(github_user=author), limit=limit), snapshot).items
+        for card in same_author:
+            if card.id == target.id:
+                continue
+            entry = scored.setdefault(card.id, SimilarAddon(card=card, score=0.0, reasons=[]))
+            entry.score += 0.5
+            entry.reasons.append(f"same author ({author})")
 
     def _add_topic_overlap(self, target: AddonDetails, scored: dict[int, SimilarAddon], snapshot: date | None) -> None:
         topics = set(target.github.topics) - {"anki", "anki-addon", "anki-add-on", "addon"} if target.github else set()
