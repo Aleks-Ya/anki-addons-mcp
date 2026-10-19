@@ -4,6 +4,7 @@ from anki_addons_mcp.adapters.memory.repository import InMemoryAddonRepository
 from anki_addons_mcp.application.catalog import TopMetric
 from anki_addons_mcp.application.maintenance import MaintenanceLabel
 from anki_addons_mcp.application.services import Services, build_services
+from anki_addons_mcp.application.similarity import SimilarAddon
 from anki_addons_mcp.application.snapshots import parse_snapshot
 from anki_addons_mcp.domain.compatibility import Support
 from anki_addons_mcp.domain.errors import AddonNotFound, InvalidQuery, SnapshotNotFound
@@ -21,6 +22,10 @@ from tests.fixtures.dataset import (
     REMOVED,
     SAME_AUTHOR,
     VIBE,
+    domain_infos,
+    domain_tags,
+    latest_records,
+    to_details,
 )
 
 
@@ -165,6 +170,28 @@ def test_similar(services: Services) -> None:
     assert similar[0].card.id == NEW_ADDON
     assert any("shared GitHub topics" in r for r in by_id[NEW_ADDON].reasons)
     assert any("same author" in r for r in by_id[SAME_AUTHOR].reasons)
+
+
+@pytest.fixture
+def similar_to_kanji_with_unvoted_quiz() -> list[SimilarAddon]:
+    records = latest_records()
+    quiz = next(r for r in records if r["id"] == NEW_ADDON)
+    quiz["anki_web"].update(rating=0, likes=0, dislikes=0)
+    repository = InMemoryAddonRepository({LATEST: [to_details(r) for r in records]},
+                                         {LATEST: domain_infos()[LATEST]}, tags={LATEST: domain_tags()[LATEST]})
+    return build_services(repository).similarity.similar(KANJI, 10)
+
+
+def test_similar_ranks_unvoted_last(similar_to_kanji_with_unvoted_quiz: list[SimilarAddon]) -> None:
+    assert [s.card.id for s in similar_to_kanji_with_unvoted_quiz][-1] == NEW_ADDON
+
+
+def test_similar_ranks_voted_before_unvoted(similar_to_kanji_with_unvoted_quiz: list[SimilarAddon]) -> None:
+    assert all(s.card.likes + s.card.dislikes > 0 for s in similar_to_kanji_with_unvoted_quiz[:-1])
+
+
+def test_similar_notes_missing_votes(similar_to_kanji_with_unvoted_quiz: list[SimilarAddon]) -> None:
+    assert "no AnkiWeb votes yet" in similar_to_kanji_with_unvoted_quiz[-1].reasons
 
 
 def test_statistics(services: Services) -> None:

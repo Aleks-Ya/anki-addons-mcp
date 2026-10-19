@@ -33,6 +33,10 @@ def _terms(details: AddonDetails) -> list[str]:
     return list(seen)[:_MAX_TERMS]
 
 
+def _unvoted(card: AddonCard) -> bool:
+    return card.likes + card.dislikes == 0
+
+
 class SimilarityService:
     def __init__(self, repository: AddonRepository, catalog: CatalogService, tags: TagService):
         self._repository = repository
@@ -63,9 +67,12 @@ class SimilarityService:
                 entry.reasons.append(f"same author ({author})")
         self._add_topic_overlap(target, scored, snapshot)
         self._add_tag_overlap(target, scored, snapshot)
-        ranked = sorted(scored.values(), key=lambda s: (-s.score, s.card.id))[:limit]
+        # Addons nobody has voted on yet are untested, so they go after every voted one.
+        ranked = sorted(scored.values(), key=lambda s: (_unvoted(s.card), -s.score, s.card.id))[:limit]
         for entry in ranked:
             entry.score = round(entry.score, 3)
+            if _unvoted(entry.card):
+                entry.reasons.append("no AnkiWeb votes yet")
         return ranked
 
     def _add_topic_overlap(self, target: AddonDetails, scored: dict[int, SimilarAddon], snapshot: date | None) -> None:

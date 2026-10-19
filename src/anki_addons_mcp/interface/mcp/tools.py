@@ -147,7 +147,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Addons similar to a given one: overlapping wording in title, summary and topics, shared GitHub "
-        "topics, shared AI function tags, or the same author."))
+        "topics, shared AI function tags, or the same author. Addons without AnkiWeb votes are listed after "
+        "voted ones."))
     def find_similar_addons(addon_id: AddonId, limit: Limit = 10, snapshot: Snapshot = "latest") -> list[SimilarAddon]:
         with tool_errors():
             return services.similarity.similar(addon_id, limit, parse_snapshot(snapshot))
