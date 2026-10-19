@@ -1,7 +1,7 @@
 ---
 name: push
-description: Push the main branch and see it through green — verify a clean tree, upgrade deps and run ruff, mypy and pytest locally, push, wait for the GitHub Actions "Unit-tests" workflow and fix any failures, then review SonarCloud issues on the new code and fix them. Use when the user says "push", "/push", or asks to push and make sure CI/Sonar are clean.
-allowed-tools: Bash(uv *) Bash(gh run *) Bash(git *) Bash(curl *)
+description: Push the main branch and see it through green — verify a clean tree, upgrade deps and run ruff, mypy and pytest locally, push, wait for the GitHub Actions "Unit-tests" workflow and fix any failures, then wait for the SonarCloud analysis of the pushed commit, review its issues on the new code and fix them. Use when the user says "push", "/push", or asks to push and make sure CI/Sonar are clean.
+allowed-tools: Bash(uv *) Bash(gh run *) Bash(git *) Bash(curl *) Bash(python3 *)
 disable-model-invocation: true
 ---
 
@@ -59,15 +59,15 @@ Never force-push on your own initiative: if the push is rejected and the user ha
 The push triggers the **Unit-tests** workflow (`.github/workflows/unit-tests.yml`: TruffleHog → Ruff → Mypy → PyTest → SonarCloud Scan). Wait for the run that corresponds to the commit just pushed.
 
 ```bash
-# Find the run for the just-pushed commit
-git rev-parse HEAD
-gh run list --branch main --limit 5
+# Find the run for the just-pushed commit (it can take a few seconds to appear — re-run if empty)
+gh run list --branch main --commit "$(git rev-parse HEAD)" --workflow unit-tests.yml --limit 1
 ```
 
-Watch it to completion (this blocks until the run finishes):
+Watch that run to completion (this blocks until the run finishes; always pass the run id — without it
+`gh run watch` prompts to pick a run):
 
 ```bash
-gh run watch --exit-status
+gh run watch <run-id> --exit-status
 ```
 
 - `gh run watch --exit-status` exits non-zero if the run fails.
@@ -75,14 +75,41 @@ gh run watch --exit-status
 - If it **fails**, inspect the failing job and fix the errors:
 
 ```bash
-gh run view --log-failed
+gh run view <run-id> --log-failed
 ```
 
 Diagnose the failure (failing test, ruff or mypy error, TruffleHog secret finding, dependency issue, etc.), fix it in the working tree, commit, and push again. Then repeat step 4 until the workflow is green. Report clearly what failed and what you changed.
 
-## 5. Review SonarCloud issues and fix
+## 5. Wait for the SonarCloud analysis, then review issues and fix
 
-The workflow's SonarCloud Scan publishes analysis to SonarCloud (project `Aleks-Ya_anki-addons-mcp`, org `aleks-ya`, https://sonarcloud.io). After CI is green (step 4), check for open issues introduced on the pushed code.
+The workflow's SonarCloud Scan only *uploads* the report (project `Aleks-Ya_anki-addons-mcp`, org `aleks-ya`, https://sonarcloud.io); SonarCloud then processes it in the background, so a green CI run does **not** mean the analysis is done. Querying issues before it finishes returns the previous analysis — stale issues, or a false "clean".
+
+### 5a. Wait for the analysis of the pushed commit
+
+After CI is green (step 4), poll SonarCloud every 15 s, for up to 10 min, until its latest analysis is for `HEAD`. Run the poll as a single `python3` command (no shell `for`/`sleep` loop), with a Bash timeout of at least 660000 ms:
+
+```bash
+python3 -c '
+import json, sys, time, urllib.request
+url = "https://sonarcloud.io/api/project_analyses/search?project=Aleks-Ya_anki-addons-mcp&ps=1"
+for _ in range(40):
+    analyses = json.load(urllib.request.urlopen(url)).get("analyses", [])
+    revision = analyses[0].get("revision") if analyses else None
+    print(time.strftime("%H:%M:%S"), revision, flush=True)
+    if revision == sys.argv[1]:
+        break
+    time.sleep(15)
+else:
+    sys.exit("SonarCloud has not analyzed " + sys.argv[1] + " yet")
+' "$(git rev-parse HEAD)"
+```
+
+- The latest analysis `revision` equals `git rev-parse HEAD`: the analysis is done — continue to 5b.
+- Still not there after ~10 min: stop and report the last revision seen, and point the user to the dashboard (link below). Do not review issues from an older analysis as if they were current.
+
+### 5b. Review issues and fix
+
+Check for open issues introduced on the pushed code:
 
 ```bash
 # Open issues for the project (public API; add -H "Authorization: Bearer $SONAR_TOKEN" if needed)
@@ -96,10 +123,10 @@ Focus on issues touching the code just pushed (recent `creationDate`, or files i
 - Fix the underlying code — don't just silence it. Only suppress (e.g. `# NOSONAR`) when the rule is a genuine false positive, and say so.
 - Re-run the checks locally (ruff, mypy, `uv run pytest`) before pushing the fix.
 
-Commit and push the fixes, then loop back through steps 4–5 (CI runs again, Sonar re-analyzes) until CI is green and there are no new/open Sonar issues on the changed code.
+Commit and push the fixes, then loop back through steps 4–5 (wait for CI again, wait for Sonar to analyze the new `HEAD` again, re-check issues) until CI is green and the analysis of the final `HEAD` has no new/open Sonar issues on the changed code.
 
 If the SonarCloud API returns nothing usable (auth required and no token available), tell the user and point them to the dashboard: https://sonarcloud.io/project/issues?id=Aleks-Ya_anki-addons-mcp&resolved=false
 
 ## Done
 
-Report the final state: pushed commit SHA, CI result, and Sonar status (clean, or what was fixed).
+Report the final state: pushed commit SHA, CI result, the SHA SonarCloud analyzed, and Sonar status (clean, or what was fixed).
