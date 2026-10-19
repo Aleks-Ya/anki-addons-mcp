@@ -173,17 +173,35 @@ echo "requires-python: $REQ (installing $PYMIN)"
 uv python install "$PYMIN"
 ```
 
-Then run the pinned check:
+Then run the pinned check, retrying every 15 s for up to ~3 min. The JSON endpoint in 6a can return `200`
+before the simple index that uv installs from lists the new files, so the first attempts may fail on
+propagation alone. Run the retry as a single `python3` command (no shell `for`/`sleep` loop), with a Bash
+timeout of at least 300000 ms:
 
 ```bash
-uvx --refresh -p "$PYMIN" "anki-addons-mcp@<version>" --version 2>&1 | grep -x "<version>" \
-  || { echo "FAILED: uvx did not run <version>"; exit 1; }
+python3 -c '
+import subprocess, sys, time
+version, pymin = sys.argv[1], sys.argv[2]
+cmd = ["uvx", "--refresh", "-p", pymin, f"anki-addons-mcp@{version}", "--version"]
+for attempt in range(1, 13):
+    run = subprocess.run(cmd, capture_output=True, text=True)
+    lines = [line.strip() for line in (run.stdout + run.stderr).splitlines()]
+    last = lines[-1] if lines else ""
+    print(time.strftime("%H:%M:%S"), f"attempt {attempt}:", last or "(no output)", flush=True)
+    if version in lines:
+        break
+    time.sleep(15)
+else:
+    sys.exit(f"FAILED: uvx did not run {version}")
+' "<version>" "$PYMIN"
 ```
+
+Only if every attempt fails is the release broken: report the last output and stop.
 
 `--refresh` bypasses uvx's cache so it fetches the newly published version; `@<version>` pins the release
 and `-p "$PYMIN"` picks an interpreter that release's `requires-python` accepts — without them, uv picks
-an interpreter first and silently falls back to an older release. The `grep` makes the app's own `--version`
-output the pass condition, so the step cannot succeed on the wrong version.
+an interpreter first and silently falls back to an older release. Requiring a line that is exactly `<version>` makes the app's own
+`--version` output the pass condition, so the step cannot succeed on the wrong version.
 
 ### 6c. Check the bare command users actually type
 
