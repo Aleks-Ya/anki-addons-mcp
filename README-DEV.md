@@ -160,7 +160,7 @@ for the rebuild and smoke-tests the endpoint.
 The version lives in `src/anki_addons_mcp/__init__.py` (`__version__`) and is bumped with
 [bump-my-version](https://github.com/callowayproject/bump-my-version) (`.bumpversion.toml`). Development
 versions carry the `.dev0` suffix; each bump makes a commit and needs a clean working tree.
-Step 1 is automated by the skill `/push`, steps 5–8 by the skill `/release`.
+Step 1 is automated by the skill `/push`, steps 2–8 by the skill `/release`.
 
 1. Push `main` and wait for a green [Unit-tests](#continuous-integration) run and a clean SonarCloud report
 2. Show the next versions: `uv run bump-my-version show-bump`
