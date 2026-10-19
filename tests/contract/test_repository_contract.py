@@ -46,6 +46,16 @@ def test_get_addon(repository: AddonRepository) -> None:
     assert details.description is None and details.readme is None
 
 
+def test_links_and_repo_source_in_details(repository: AddonRepository) -> None:
+    details = repository.get_addon(VIBE)
+    assert details is not None
+    [link] = details.anki_web.links
+    assert (link.url, link.section, link.count, link.texts) == (f"https://example.com/{VIBE}", "description", 1, ["site"])
+    assert details.github is not None and details.github.repo_source == "ai"
+    other = repository.get_addon(KANJI)
+    assert other is not None and other.github is not None and other.github.repo_source == "self_reference"
+
+
 def test_get_addon_missing(repository: AddonRepository) -> None:
     assert repository.get_addon(424242) is None
 

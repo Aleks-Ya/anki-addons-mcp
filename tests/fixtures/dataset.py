@@ -88,7 +88,8 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
             "anki_point_version": point_version,
             "anki_version_kind": version_kind,
             "branches": [_branch(lo, hi, update_date) for lo, hi in (branches or [("2.1.50", "+")])],
-            "links": [f"https://example.com/{addon_id}"],
+            "links": [{"url": f"https://example.com/{addon_id}", "section": "description", "count": 1,
+                       "texts": ["site"]}],
             "likes": likes,
             "dislikes": dislikes,
             "ai_declaration_markers": ai_declaration or [],
@@ -105,9 +106,9 @@ def github(user: str, repo: str, *, stars: int = 0, last_commit: str | None = "2
            tests: int | None = 0, actions: int | None = 0, license: str | None = "MIT",
            languages: list[str] | None = None, topics: list[str] | None = None, archived: bool = False,
            manifest: dict[str, Any] | None = None, readme: str | None = None,
-           ai_tooling: list[str] | None = None) -> dict[str, Any]:
+           ai_tooling: list[str] | None = None, repo_source: str = "self_reference") -> dict[str, Any]:
     return {
-        "user": user, "repo": repo, "languages": languages or ["Python"], "stars": stars,
+        "user": user, "repo": repo, "repo_source": repo_source, "languages": languages or ["Python"], "stars": stars,
         "last_commit": last_commit,
         "links": [{"url": f"https://github.com/{user}/{repo}", "user": user, "repo": repo}],
         "action_count": actions, "tests_count": tests, "license": license, "forks": 1, "open_issues": 2,
@@ -161,7 +162,7 @@ def latest_records() -> list[dict[str, Any]]:
               anki_version="25.09~", branches=[("25.09", "+")], description="Deck tools vibe-coded with claude.",
               ai_declaration=["claude", "vibe-coded"], ai_tags=["deck-management", "beta"],
               github=github("erin", "vibe-deck", stars=1, last_commit="2026-09-28T12:00:00", license="MIT",
-                            ai_tooling=["claude-code", "agents-md"], topics=["deck"])),
+                            ai_tooling=["claude-code", "agents-md"], topics=["deck"], repo_source="ai")),
         addon(NEW_ADDON, "Kanji Quiz", rating=10, likes=10, update_date="2026-09-25", anki_version="25.02~",
               branches=[("25.02", "+")], description="Quiz yourself on kanji meanings.",
               ai_summary="Kanji meaning quiz.", ai_tags=["quiz", "dictionary"],

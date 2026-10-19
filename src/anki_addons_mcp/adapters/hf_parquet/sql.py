@@ -26,7 +26,9 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("branches", "anki_web.branches",
      ("STRUCT(min_version, max_version, updated, min_point_version, max_point_version, max_version_kind)[], "
       "AnkiWeb branches; raw max_version '+' = open, 'B+' = tested, 'B' = hard, empty = unknown")),
-    ("links", "anki_web.links", "VARCHAR[], links found on the AnkiWeb page"),
+    ("links", "anki_web.links",
+     ("STRUCT(url, section, count, texts VARCHAR[])[], links found on the AnkiWeb page; "
+      "section 'description' or 'contact_author', texts = anchor texts")),
     ("ai_declaration_markers", "anki_web.ai_declaration_markers", "VARCHAR[], AI-usage words in the description"),
     ("description_language", "anki_web.description_language", "VARCHAR, ISO code"),
     ("description_language_confidence", "anki_web.description_language_confidence", "DOUBLE"),
@@ -34,6 +36,8 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("has_github", "github IS NOT NULL", "BOOLEAN"),
     ("github_user", "github.user", "VARCHAR"),
     ("github_repo", "github.repo", "VARCHAR"),
+    ("github_repo_source", "github.repo_source",
+     "VARCHAR, how the repo was matched: 'override', 'contact_author', 'self_reference', 'ai', 'most_linked'"),
     ("github_languages", "github.languages", "VARCHAR[]"),
     ("github_stars", "github.stars", "BIGINT"),
     ("github_last_commit", "github.last_commit", "VARCHAR, ISO timestamp"),

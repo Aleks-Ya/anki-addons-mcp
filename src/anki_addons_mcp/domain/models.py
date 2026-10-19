@@ -26,6 +26,13 @@ class Branch(BaseModel):
     max_version_kind: Kind = VersionKind.UNKNOWN
 
 
+class AnkiWebLink(BaseModel):
+    url: str
+    section: str | None = None
+    count: int = 0
+    texts: list[str] = Field(default_factory=list)
+
+
 class AnkiWebInfo(BaseModel):
     title: str
     addon_page_url: str
@@ -36,7 +43,7 @@ class AnkiWebInfo(BaseModel):
     anki_point_version: int | None = None
     anki_version_kind: Kind = VersionKind.UNKNOWN
     branches: list[Branch] = Field(default_factory=list)
-    links: list[str] = Field(default_factory=list)
+    links: list[AnkiWebLink] = Field(default_factory=list)
     likes: int = 0
     dislikes: int = 0
     ai_declaration_markers: list[str] = Field(default_factory=list)
@@ -76,6 +83,7 @@ class Manifest(BaseModel):
 class GithubInfo(BaseModel):
     user: str | None = None
     repo: str | None = None
+    repo_source: str | None = None
     languages: list[str] = Field(default_factory=list)
     stars: int = 0
     last_commit: str | None = None
