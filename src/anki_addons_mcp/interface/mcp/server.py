@@ -24,7 +24,8 @@ Anki Forum and AI-summary and AI-tag data, published as monthly snapshots.
 """
 
 
-async def _healthz(request: Request) -> JSONResponse:  # NOSONAR: MCPServer.custom_route requires an async handler
+# MCPServer.custom_route requires an async handler, so the async without await is intended
+async def _healthz(request: Request) -> JSONResponse:  # NOSONAR
     return JSONResponse({"status": "ok", "version": __version__})
 
 
