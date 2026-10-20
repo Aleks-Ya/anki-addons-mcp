@@ -77,7 +77,7 @@ For each kept candidate, collect its status (information for the user, not a fil
 
 ### 2c. Ask
 
-If no candidate is left, nothing needs deploying: report each candidate's reason and skip to step 5 to
+If no candidate is left, nothing needs deploying: report each candidate's reason and skip to step 6 to
 smoke-test what runs now.
 
 Otherwise ask with `AskUserQuestion` (single-select), even when only one candidate is left — never deploy
