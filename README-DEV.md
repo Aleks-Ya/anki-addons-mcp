@@ -153,8 +153,9 @@ The endpoint is `https://ya-alex-anki-addons-mcp.hf.space/mcp`. The Space loads 
 startup; its disk is ephemeral, so snapshots are downloaded again after a restart.
 
 Step 3 for an existing Space is automated by the skill `/deploy`: it suggests the latest release and `main`
-(those ahead of the Space that passed CI), deploys the chosen one, waits for the rebuild and smoke-tests the
-endpoint. It only moves the Space forward and never force-pushes.
+(those ahead of the Space, with whether they are on GitHub and passed CI), deploys the chosen one (running the
+tests locally first when it has no green CI), waits for the rebuild and smoke-tests the endpoint. It only moves
+the Space forward and never force-pushes.
 
 ## Release a new version
 
