@@ -217,7 +217,8 @@ def test_similar_lists_fork_parent(services: Services) -> None:
 def test_maintenance_points_abandoned_addon_to_its_forks(services: Services) -> None:
     report = services.maintenance.assess(LEGACY)
     assert report.signals.forks == [VIBE]
-    assert any(str(VIBE) in reason and "forked" in reason for reason in report.reasons)
+    assert (f'Another addon was forked from this one and may still be maintained: "Vibe Deck Tools" ({VIBE}).'
+            in report.reasons)
 
 
 def test_maintenance_skips_forks_of_active_addon(services: Services) -> None:

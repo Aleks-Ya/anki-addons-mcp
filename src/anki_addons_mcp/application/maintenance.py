@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from anki_addons_mcp.application.catalog import CatalogService
 from anki_addons_mcp.application.snapshots import SnapshotService
+from anki_addons_mcp.domain.errors import AddonNotFound
 
 
 class MaintenanceLabel(StrEnum):
@@ -91,10 +92,17 @@ class MaintenanceService:
         )
         label, reasons = self._label(signals)
         if signals.forks and label in (MaintenanceLabel.STALE, MaintenanceLabel.ABANDONED):
-            reasons.append(f"Addons forked from it may carry it on: {', '.join(map(str, signals.forks))} "
-                           "(check them with assess_maintenance).")
+            reasons.append(self._forks_reason(signals.forks, snapshot))
         return MaintenanceReport(addon_id=addon_id, title=details.anki_web.title, as_of=as_of, label=label,
                                  reasons=reasons, signals=signals)
+
+    def _forks_reason(self, forks: list[int], snapshot: date | None) -> str:
+        try:
+            names = [f'"{fork.anki_web.title}" ({fork.id})' for fork in self._catalog.get_many(forks, snapshot)]
+        except AddonNotFound:
+            names = [str(fork) for fork in forks]
+        lead = "Another addon was" if len(forks) == 1 else f"{len(forks)} other addons were"
+        return f"{lead} forked from this one and may still be maintained: {', '.join(names)}."
 
     def _label(self, signals: MaintenanceSignals) -> tuple[MaintenanceLabel, list[str]]:
         reasons = []

@@ -156,7 +156,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Maintenance health of an addon: last update/commit, archived flag, open issues, tests, CI and forum "
-        "activity, plus a coarse label (active, stale, abandoned, unknown) with reasons."))
+        "activity, plus a coarse label (active, stale, abandoned, unknown) with reasons. For a stale or abandoned "
+        "addon, the reasons name its forks; signals.forks holds their ids for assessing them in turn."))
     def assess_maintenance(addon_id: AddonId, snapshot: Snapshot = "latest") -> MaintenanceReport:
         with tool_errors():
             return services.maintenance.assess(addon_id, parse_snapshot(snapshot))
