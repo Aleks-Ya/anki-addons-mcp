@@ -5,7 +5,7 @@ import pytest
 from anki_addons_mcp.adapters.hf_parquet.repository import DuckDbAddonRepository
 from anki_addons_mcp.adapters.memory.repository import InMemoryAddonRepository
 from anki_addons_mcp.domain.errors import InvalidQuery, SnapshotNotFound
-from anki_addons_mcp.domain.models import NONE_GROUP, GroupField, TextKind, VersionKind
+from anki_addons_mcp.domain.models import NONE_GROUP, ForkEvidence, GroupField, TextKind, VersionKind
 from anki_addons_mcp.domain.ports import AddonRepository
 from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, SortField
 from tests.fixtures.dataset import (
@@ -110,6 +110,30 @@ def test_author_filter_in_snapshot_without_authors(repository: AddonRepository) 
     assert ids(repository, AddonQuery(filters=AddonFilters(author_id=KANJI)), OLD) == []
 
 
+def test_forks_in_details(repository: AddonRepository) -> None:
+    fork = repository.get_addon(NEW_ADDON)
+    assert fork is not None
+    assert [(r.id, r.evidence) for r in fork.forked_from] == [(KANJI, ForkEvidence.GITHUB_FORK)]
+    assert fork.github is not None
+    assert fork.github.fork_source == "alice/kanji-helper"
+    parent = repository.get_addon(KANJI)
+    assert parent is not None
+    assert (parent.forked_from, parent.forks) == ([], [NEW_ADDON])
+
+
+def test_forks_on_cards(repository: AddonRepository) -> None:
+    cards = {c.id: c for c in repository.find(AddonQuery(filters=AddonFilters(addon_ids=[VIBE, LEGACY]))).items}
+    assert (cards[VIBE].forked_from, cards[VIBE].forks) == ([LEGACY], [])
+    assert (cards[LEGACY].forked_from, cards[LEGACY].forks) == ([], [VIBE])
+
+
+def test_forks_in_old_snapshot(repository: AddonRepository) -> None:
+    kanji = repository.get_addon(KANJI, OLD)
+    assert kanji is not None
+    assert kanji.forks == []
+    assert ids(repository, AddonQuery(filters=AddonFilters(fork_of=LEGACY)), OLD) == [VIBE]
+
+
 def test_description_details(repository: AddonRepository) -> None:
     details = repository.get_addon(LEGACY)
     assert details is not None
@@ -171,6 +195,11 @@ def test_find_text_no_match(repository: AddonRepository) -> None:
     (AddonFilters(description_language="DE"), {NO_GITHUB}),
     (AddonFilters(github_user="alice"), {KANJI, SAME_AUTHOR}),
     (AddonFilters(author_id=KANJI), set(ALICE_ADDONS)),
+    (AddonFilters(is_fork=True), {VIBE, NEW_ADDON}),
+    (AddonFilters(has_forks=True), {KANJI, LEGACY}),
+    (AddonFilters(is_fork=False, has_forks=False), {OCCLUSION, HEATMAP, NO_GITHUB, SAME_AUTHOR}),
+    (AddonFilters(fork_of=KANJI), {NEW_ADDON}),
+    (AddonFilters(fork_of=OCCLUSION), set()),
     (AddonFilters(updated_after=date(2026, 9, 1)), {KANJI, VIBE, NEW_ADDON}),
     (AddonFilters(updated_before=date(2020, 1, 1)), {LEGACY}),
     (AddonFilters(archived=True), {LEGACY}),

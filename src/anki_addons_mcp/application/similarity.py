@@ -48,6 +48,7 @@ class SimilarityService:
         target = self._catalog.get(addon_id, snapshot)
         scored = self._wording_matches(target, limit, snapshot)
         self._add_same_author(target, scored, limit, snapshot)
+        self._add_fork_relations(target, scored, snapshot)
         self._add_topic_overlap(target, scored, snapshot)
         self._add_tag_overlap(target, scored, snapshot)
         # Addons nobody has voted on yet are untested, so they go after every voted one.
@@ -84,6 +85,22 @@ class SimilarityService:
             entry = scored.setdefault(card.id, SimilarAddon(card=card, score=0.0, reasons=[]))
             entry.score += 0.5
             entry.reasons.append(reason)
+
+    def _add_fork_relations(self, target: AddonDetails, scored: dict[int, SimilarAddon],
+                            snapshot: date | None) -> None:
+        reasons = {fork: "forked from this addon" for fork in target.forks if fork != target.id}
+        reasons.update({relation.id: f"this addon is a fork of it ({relation.evidence} evidence)"
+                        for relation in target.forked_from if relation.id != target.id})
+        missing = [addon_id for addon_id in reasons if addon_id not in scored]
+        if missing:
+            cards = self._repository.find(
+                AddonQuery(filters=AddonFilters(addon_ids=missing), limit=len(missing)), snapshot).items
+            for card in cards:
+                scored[card.id] = SimilarAddon(card=card, score=0.0, reasons=[])
+        for addon_id, reason in reasons.items():
+            if addon_id in scored:
+                scored[addon_id].score += 1.0
+                scored[addon_id].reasons.append(reason)
 
     def _add_topic_overlap(self, target: AddonDetails, scored: dict[int, SimilarAddon], snapshot: date | None) -> None:
         topics = set(target.github.topics) - {"anki", "anki-addon", "anki-add-on", "addon"} if target.github else set()

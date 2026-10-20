@@ -55,6 +55,17 @@ def _anki_web_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
     return checks
 
 
+def _fork_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
+    checks: list[bool] = []
+    if f.is_fork is not None:
+        checks.append(bool(d.forked_from) == f.is_fork)
+    if f.has_forks is not None:
+        checks.append(bool(d.forks) == f.has_forks)
+    if f.fork_of is not None:
+        checks.append(any(relation.id == f.fork_of for relation in d.forked_from))
+    return checks
+
+
 def _github_checks(gh: GithubInfo | None, f: AddonFilters) -> list[bool]:
     checks: list[bool] = []
     if f.min_stars is not None:
@@ -99,8 +110,8 @@ def _tag_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
 
 
 def _matches(d: AddonDetails, f: AddonFilters) -> bool:
-    return all(_anki_web_checks(d, f) + _github_checks(d.github, f) + _version_checks(d.anki_web, f)
-               + _tag_checks(d, f))
+    return all(_anki_web_checks(d, f) + _fork_checks(d, f) + _github_checks(d.github, f)
+               + _version_checks(d.anki_web, f) + _tag_checks(d, f))
 
 
 def _score(d: AddonDetails, terms: list[str]) -> float:

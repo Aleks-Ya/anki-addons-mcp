@@ -9,6 +9,7 @@ from anki_addons_mcp.domain.models import (
     AnkiWebLink,
     AuthorInfo,
     Branch,
+    ForkRelation,
     ForumInfo,
     GithubInfo,
     GithubLink,
@@ -22,6 +23,7 @@ CARD_COLUMNS = [
     "anki_version_kind", "ai_summary",
     "github_user", "github_repo", "github_stars", "github_last_commit", "github_archived", "github_license",
     "forum_posts_count", "ai_tags", "author_id",
+    "forked_from", "forks",
 ]
 
 
@@ -52,7 +54,8 @@ def row_to_card(row: dict[str, Any], score: float | None = None) -> AddonCard:
         github_user=row["github_user"], github_repo=row["github_repo"], github_stars=row["github_stars"],
         github_last_commit=row["github_last_commit"], github_archived=row["github_archived"],
         license=row["github_license"], forum_posts_count=row["forum_posts_count"], ai_tags=_list(row["ai_tags"]),
-        author_id=row["author_id"], score=score,
+        author_id=row["author_id"], forked_from=[r["id"] for r in _structs(row["forked_from"])],
+        forks=_list(row["forks"]), score=score,
     )
 
 
@@ -109,6 +112,7 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
             manifest=_manifest(row["github_manifest"]),
             dependencies=_list(row["github_dependencies"]),
             ai_tooling_markers=_list(row["github_ai_tooling_markers"]),
+            fork_source=row["github_fork_source"],
         )
     forum = None
     if row["has_forum"] or row["forum_topic_id"] is not None:
@@ -122,4 +126,6 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
     tags = _list(row["ai_tags"])
     has_ai = row["ai_summary"] or row["ai_model"] or tags
     ai = AiInfo(summary=row["ai_summary"], model=row["ai_model"], tags=tags) if has_ai else None
-    return AddonDetails(id=row["id"], anki_web=anki_web, github=github, forum=forum, ai=ai, author=_author(row))
+    forked_from = [ForkRelation.model_validate(r) for r in _structs(row["forked_from"])]
+    return AddonDetails(id=row["id"], anki_web=anki_web, github=github, forum=forum, ai=ai, author=_author(row),
+                        forked_from=forked_from, forks=_list(row["forks"]))

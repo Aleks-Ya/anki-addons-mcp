@@ -5,7 +5,7 @@ import pytest
 from anki_addons_mcp.adapters.hf_parquet.repository import DuckDbAddonRepository
 from anki_addons_mcp.domain.errors import InvalidQuery
 from anki_addons_mcp.domain.ports import SqlQueryable
-from tests.fixtures.dataset import OLD
+from tests.fixtures.dataset import KANJI, LEGACY, OLD
 
 
 def test_is_sql_queryable(duckdb_repository: DuckDbAddonRepository) -> None:
@@ -46,6 +46,21 @@ def test_dataset_2_4_columns(duckdb_repository: DuckDbAddonRepository, snapshot:
         "SELECT count(DISTINCT author_id), count(description_html), count_if(description_pre_wrap) FROM addons",
         snapshot, 10, 5)
     assert result.rows == [expected]
+
+
+@pytest.mark.parametrize(("snapshot", "expected"), [(None, [2, 2, 1]), (OLD, [1, 1, 0])])
+def test_dataset_2_5_columns(duckdb_repository: DuckDbAddonRepository, snapshot: date | None,
+                             expected: list[int]) -> None:
+    result = duckdb_repository.execute_readonly(
+        "SELECT count_if(len(forked_from) > 0), count_if(len(forks) > 0), count(github_fork_source) FROM addons",
+        snapshot, 10, 5)
+    assert result.rows == [expected]
+
+
+def test_fork_evidence_column(duckdb_repository: DuckDbAddonRepository) -> None:
+    result = duckdb_repository.execute_readonly(
+        "SELECT r.id, r.evidence FROM (SELECT unnest(forked_from) AS r FROM addons) ORDER BY 1", None, 10, 5)
+    assert result.rows == [[KANJI, "github_fork"], [LEGACY, "ai"]]
 
 
 def test_row_cap(duckdb_repository: DuckDbAddonRepository) -> None:

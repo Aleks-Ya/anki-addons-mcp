@@ -76,7 +76,8 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
           ai_declaration: list[str] | None = None, lang: str | None = "en",
           github: dict[str, Any] | None = None, forum: dict[str, Any] | None = None,
           ai_summary: str | None = None, ai_tags: list[str] | None = None,
-          author_addons: list[int] | None = None) -> dict[str, Any]:
+          author_addons: list[int] | None = None,
+          forked_from: list[tuple[int, str]] | None = None) -> dict[str, Any]:
     point_version, version_kind = _addons_list_version(anki_version)
     group = author_addons or [addon_id]
     return {
@@ -108,14 +109,29 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
         "forum": forum,
         "ai": {"summary": ai_summary, "model": "test-model", "tags": ai_tags or []} if ai_summary or ai_tags else None,
         "author": {"id": min(group), "addon_count": len(group)},
+        "forked_from": [{"id": parent, "evidence": evidence} for parent, evidence in forked_from or []],
+        "forks": [],
     }
+
+
+def _link_forks(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Fills `forks` as the reverse of `forked_from`, as the dataset does."""
+    by_id = {r["id"]: r for r in records}
+    for record in by_id.values():
+        record["forks"] = []
+    for record in sorted(records, key=lambda r: r["id"]):
+        for relation in record["forked_from"]:
+            if relation["id"] in by_id:
+                by_id[relation["id"]]["forks"].append(record["id"])
+    return records
 
 
 def github(user: str, repo: str, *, stars: int = 0, last_commit: str | None = "2026-01-01T10:00:00",
            tests: int | None = 0, actions: int | None = 0, license: str | None = "MIT",
            languages: list[str] | None = None, topics: list[str] | None = None, archived: bool = False,
            manifest: dict[str, Any] | None = None, readme: str | None = None,
-           ai_tooling: list[str] | None = None, repo_source: str = "self_reference") -> dict[str, Any]:
+           ai_tooling: list[str] | None = None, repo_source: str = "self_reference",
+           fork_source: str | None = None) -> dict[str, Any]:
     return {
         "user": user, "repo": repo, "repo_source": repo_source, "languages": languages or ["Python"], "stars": stars,
         "last_commit": last_commit,
@@ -126,7 +142,7 @@ def github(user: str, repo: str, *, stars: int = 0, last_commit: str | None = "2
         "primary_language": (languages or ["Python"])[0],
         "language_bytes": [{"name": (languages or ["Python"])[0], "bytes": 1000}],
         "manifest": manifest, "dependencies": ["requests"] if manifest else [], "readme": readme,
-        "ai_tooling_markers": ai_tooling or [],
+        "ai_tooling_markers": ai_tooling or [], "fork_source": fork_source,
     }
 
 
@@ -136,7 +152,7 @@ def forum(topic_id: int, posts: int) -> dict[str, Any]:
 
 
 def latest_records() -> list[dict[str, Any]]:
-    return [
+    return _link_forks([
         addon(KANJI, "Kanji Helper", rating=130, likes=125, dislikes=5, update_date="2026-09-20",
               anki_version="25.02~", branches=[("2.1.0", "2.1.49"), ("25.02", "+")],
               description="Look up kanji stroke order and readings while reviewing japanese vocabulary.",
@@ -172,17 +188,19 @@ def latest_records() -> list[dict[str, Any]]:
         addon(VIBE, "Vibe Deck Tools", rating=4, likes=3, dislikes=1, update_date="2026-09-29",
               anki_version="25.09~", branches=[("25.09", "+")], description="Deck tools vibe-coded with claude.",
               ai_declaration=["claude", "vibe-coded"], ai_tags=["deck-management", "beta"],
+              forked_from=[(LEGACY, "ai")],
               github=github("erin", "vibe-deck", stars=1, last_commit="2026-09-28T12:00:00", license="MIT",
                             ai_tooling=["claude-code", "agents-md"], topics=["deck"], repo_source="ai")),
         addon(NEW_ADDON, "Kanji Quiz", rating=10, likes=10, update_date="2026-09-25", anki_version="25.02~",
               branches=[("25.02", "+")], description="Quiz yourself on kanji meanings.",
-              ai_summary="Kanji meaning quiz.", ai_tags=["quiz", "dictionary"],
-              github=github("frank", "kanji-quiz", stars=5, topics=["kanji", "quiz"])),
+              ai_summary="Kanji meaning quiz.", ai_tags=["quiz", "dictionary"], forked_from=[(KANJI, "github_fork")],
+              github=github("frank", "kanji-quiz", stars=5, topics=["kanji", "quiz"],
+                            fork_source="alice/kanji-helper")),
         addon(SAME_AUTHOR, "Alice Utilities", rating=42, likes=41, dislikes=1, update_date="2026-05-05",
               anki_version="23.10~", branches=[("23.10", "+")], description="Assorted utilities.",
               author_addons=ALICE_ADDONS,
               github=github("Alice", "alice-utils", stars=20, topics=["utilities"])),
-    ]
+    ])
 
 
 def old_records() -> list[dict[str, Any]]:
@@ -201,7 +219,7 @@ def old_records() -> list[dict[str, Any]]:
             record["github"]["manifest"] = None
             record["github"]["readme"] = None
             record["github"]["dependencies"] = []
-    return list(by_id.values())
+    return _link_forks(list(by_id.values()))
 
 
 def _metadata(snapshot: date) -> dict[str, str]:

@@ -29,6 +29,9 @@ class AddonFilters(BaseModel):
     description_language: str | None = None
     github_user: str | None = None
     author_id: int | None = None
+    is_fork: bool | None = None
+    has_forks: bool | None = None
+    fork_of: int | None = None
     updated_after: date | None = None
     updated_before: date | None = None
     archived: bool | None = None

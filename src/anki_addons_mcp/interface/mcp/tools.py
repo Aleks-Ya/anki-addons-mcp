@@ -55,6 +55,11 @@ HasAiTooling = Annotated[bool | None, Field(
 AuthorId = Annotated[int | None, Field(
     description="Derived AnkiWeb author id (author_id of an addon card); null in snapshots collected before "
                 "authors were tracked")]
+IsFork = Annotated[bool | None, Field(
+    description="Addon was forked from another catalog addon (detection is incomplete; 'ai' evidence may be wrong)")]
+HasForks = Annotated[bool | None, Field(description="Other catalog addons were forked from this addon")]
+ForkOf = Annotated[int | None, Field(
+    description="Only forks of this addon id, e.g. to find a maintained fork of an abandoned addon")]
 DescriptionFormat = Literal["text", "html"]
 _DESCRIPTION_KINDS = {"text": TextKind.DESCRIPTION, "html": TextKind.DESCRIPTION_HTML}
 
@@ -80,6 +85,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         anki_version_kind: AnkiVersionKind = None, anki_version_at_least: AnkiVersionAtLeast = None,
         updated_after: date | None = None, updated_before: date | None = None,
         archived: bool | None = None, author_id: AuthorId = None,
+        is_fork: IsFork = None, has_forks: HasForks = None, fork_of: ForkOf = None,
         has_ai_declaration: HasAiDeclaration = None, has_ai_tooling: HasAiTooling = None,
         tags: Tags = None, exclude_tags: ExcludeTags = None,
         limit: Limit = 20, offset: Offset = 0, snapshot: Snapshot = "latest",
@@ -101,6 +107,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         anki_version_kind: AnkiVersionKind = None, anki_version_at_least: AnkiVersionAtLeast = None,
         updated_after: date | None = None, updated_before: date | None = None,
         archived: bool | None = None, author_id: AuthorId = None,
+        is_fork: IsFork = None, has_forks: HasForks = None, fork_of: ForkOf = None,
         has_ai_declaration: HasAiDeclaration = None, has_ai_tooling: HasAiTooling = None,
         tags: Tags = None, exclude_tags: ExcludeTags = None,
         sort_by: SortField = SortField.RATING, descending: bool = True,
@@ -112,7 +119,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Full record of one addon: AnkiWeb info and version branches, GitHub repository data and manifest, "
-        "Anki Forum topic and AI summary and tags. Long texts and link lists are omitted unless requested in 'include'."))
+        "Anki Forum topic, AI summary and tags, and fork relations (forked_from, forks). Long texts and link "
+        "lists are omitted unless requested in 'include'."))
     def get_addon(addon_id: AddonId, include: list[AddonInclude] | None = None,
                   max_chars: MaxChars = 4000, snapshot: Snapshot = "latest") -> AddonDetails:
         parts = set(include or [])
@@ -155,8 +163,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Addons similar to a given one: overlapping wording in title, summary and topics, shared GitHub "
-        "topics, shared AI function tags, or the same author. Addons without AnkiWeb votes are listed after "
-        "voted ones."))
+        "topics, shared AI function tags, the same author, or a fork relation (forks of the addon and the addons "
+        "it was forked from). Addons without AnkiWeb votes are listed after voted ones."))
     def find_similar_addons(addon_id: AddonId, limit: Limit = 10, snapshot: Snapshot = "latest") -> list[SimilarAddon]:
         with tool_errors():
             return services.similarity.similar(addon_id, limit, parse_snapshot(snapshot))

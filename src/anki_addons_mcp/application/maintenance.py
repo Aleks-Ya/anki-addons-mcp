@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from enum import StrEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from anki_addons_mcp.application.catalog import CatalogService
 from anki_addons_mcp.application.snapshots import SnapshotService
@@ -31,6 +31,8 @@ class MaintenanceSignals(BaseModel):
     forum_posts_count: int | None
     last_activity: date | None
     days_since_last_activity: int | None
+    forked_from: list[int] = Field(default_factory=list, description="Addons this one was forked from")
+    forks: list[int] = Field(default_factory=list, description="Addons forked from this one")
 
 
 class MaintenanceReport(BaseModel):
@@ -84,8 +86,13 @@ class MaintenanceService:
             forum_posts_count=forum.posts_count if forum else None,
             last_activity=last_activity,
             days_since_last_activity=days,
+            forked_from=[relation.id for relation in details.forked_from],
+            forks=list(details.forks),
         )
         label, reasons = self._label(signals)
+        if signals.forks and label in (MaintenanceLabel.STALE, MaintenanceLabel.ABANDONED):
+            reasons.append(f"Addons forked from it may carry it on: {', '.join(map(str, signals.forks))} "
+                           "(check them with assess_maintenance).")
         return MaintenanceReport(addon_id=addon_id, title=details.anki_web.title, as_of=as_of, label=label,
                                  reasons=reasons, signals=signals)
 

@@ -204,6 +204,28 @@ def test_similar(services: Services) -> None:
     assert "same AnkiWeb author" in by_id[SAME_AUTHOR].reasons
 
 
+def test_similar_lists_forks(services: Services) -> None:
+    by_id = {s.card.id: s for s in services.similarity.similar(KANJI, 5)}
+    assert "forked from this addon" in by_id[NEW_ADDON].reasons
+
+
+def test_similar_lists_fork_parent(services: Services) -> None:
+    by_id = {s.card.id: s for s in services.similarity.similar(VIBE, 5)}
+    assert "this addon is a fork of it (ai evidence)" in by_id[LEGACY].reasons
+
+
+def test_maintenance_points_abandoned_addon_to_its_forks(services: Services) -> None:
+    report = services.maintenance.assess(LEGACY)
+    assert report.signals.forks == [VIBE]
+    assert any(str(VIBE) in reason and "forked" in reason for reason in report.reasons)
+
+
+def test_maintenance_skips_forks_of_active_addon(services: Services) -> None:
+    report = services.maintenance.assess(KANJI)
+    assert report.signals.forks == [NEW_ADDON]
+    assert not any("forked" in reason for reason in report.reasons)
+
+
 def test_similar_falls_back_to_github_user_without_authors(services: Services) -> None:
     similar = services.similarity.similar(KANJI, 5, OLD)
     same_author = next(s for s in similar if s.card.id == SAME_AUTHOR)

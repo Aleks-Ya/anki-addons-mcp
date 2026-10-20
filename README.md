@@ -79,6 +79,11 @@ and the `hard`/`tested`/`open`/`unknown` kind of the upper version); both tools 
 addons (`addon_id`). AnkiWeb authors are derived by the dataset and are missing in snapshots collected before
 authors were tracked. `get_addon_description` returns plain text, or the author's unsanitized HTML with
 `format=html`.
+Fork relations come from the dataset: `get_addon` shows `forked_from` (with its evidence: `github_fork`, `ai` or
+`override`), `forks` and `github.fork_source`; cards carry the ids. `search_addons` and `filter_addons` filter by
+`is_fork`, `has_forks` and `fork_of` (the forks of one addon, e.g. a maintained fork of an abandoned addon);
+`find_similar_addons` and `assess_maintenance` point to them. Detection is incomplete and `ai` evidence may be
+wrong.
 
 **Resources**: `anki-addons://dataset/readme`, `anki-addons://dataset/schema`,
 `anki-addons://dataset/anki-versions`, `anki-addons://snapshots`,

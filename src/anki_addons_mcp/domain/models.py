@@ -11,6 +11,8 @@ APPROVAL_DESCRIPTION = ("Share of likes among AnkiWeb votes, as the 95% Wilson l
 AUTHOR_ID_DESCRIPTION = ("Derived AnkiWeb author: the smallest addon id among the addons the author shared. "
                          "An anonymous label, not an AnkiWeb id; null in snapshots collected before authors "
                          "were tracked.")
+FORK_DESCRIPTION = ("Fork relations: detection is incomplete (a fork that neither uses a GitHub fork nor links the "
+                    "original from its description is missed), and 'ai' evidence may be inaccurate.")
 _Z = 1.96
 
 
@@ -75,6 +77,19 @@ class AnkiWebInfo(BaseModel):
         return value or None
 
 
+class ForkEvidence(StrEnum):
+    GITHUB_FORK = "github_fork"
+    AI = "ai"
+    OVERRIDE = "override"
+
+
+class ForkRelation(BaseModel):
+    id: int = Field(description="AnkiWeb id of the addon this one was forked from")
+    evidence: ForkEvidence = Field(
+        description="'github_fork' (the repo is a GitHub fork of the parent's repo), 'ai' (an LLM read the "
+                    "description; may be inaccurate) or 'override' (set by hand)")
+
+
 class GithubLink(BaseModel):
     url: str
     user: str | None = None
@@ -124,6 +139,8 @@ class GithubInfo(BaseModel):
     manifest: Manifest | None = None
     dependencies: list[str] = Field(default_factory=list)
     ai_tooling_markers: list[str] = Field(default_factory=list)
+    fork_source: str | None = Field(
+        default=None, description="Root repo (owner/repo) of the GitHub fork network when the repo is a fork")
 
     @computed_field
     def url(self) -> str | None:
@@ -162,6 +179,8 @@ class AddonDetails(BaseModel):
     forum: ForumInfo | None = None
     ai: AiInfo | None = None
     author: AuthorInfo | None = None
+    forked_from: list[ForkRelation] = Field(default_factory=list, description=FORK_DESCRIPTION)
+    forks: list[int] = Field(default_factory=list, description="Addons forked from this one. " + FORK_DESCRIPTION)
     description: str | None = None
     description_html: str | None = None
     readme: str | None = None
@@ -191,6 +210,8 @@ class AddonCard(BaseModel):
     forum_posts_count: int | None = None
     ai_tags: list[str] = Field(default_factory=list, description=AI_PROVENANCE)
     author_id: int | None = Field(default=None, description=AUTHOR_ID_DESCRIPTION)
+    forked_from: list[int] = Field(default_factory=list, description="Addons this one was forked from")
+    forks: list[int] = Field(default_factory=list, description="Addons forked from this one")
     score: float | None = None
 
     @computed_field(description=APPROVAL_DESCRIPTION)
@@ -221,6 +242,8 @@ class AddonCard(BaseModel):
             forum_posts_count=details.forum.posts_count if details.forum else None,
             ai_tags=list(details.ai.tags) if details.ai else [],
             author_id=details.author.id if details.author else None,
+            forked_from=[relation.id for relation in details.forked_from],
+            forks=list(details.forks),
             score=score,
         )
 

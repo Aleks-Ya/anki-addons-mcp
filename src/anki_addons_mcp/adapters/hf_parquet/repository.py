@@ -120,6 +120,15 @@ def _anki_web_filters(f: AddonFilters, add: _Add) -> None:
         add("author_id = ?", f.author_id)
 
 
+def _fork_filters(f: AddonFilters, add: _Add) -> None:
+    if f.is_fork is not None:
+        add("(coalesce(len(forked_from), 0) > 0) = ?", f.is_fork)
+    if f.has_forks is not None:
+        add("(coalesce(len(forks), 0) > 0) = ?", f.has_forks)
+    if f.fork_of is not None:
+        add("list_contains(list_transform(forked_from, lambda r: r.id), ?)", f.fork_of)
+
+
 def _github_filters(f: AddonFilters, add: _Add) -> None:
     if f.min_stars is not None:
         add("has_github AND github_stars >= ?", f.min_stars)
@@ -160,6 +169,7 @@ def _filters_sql(f: AddonFilters) -> tuple[list[str], list[Any]]:
         params.extend(values)
 
     _anki_web_filters(f, add)
+    _fork_filters(f, add)
     _github_filters(f, add)
     _version_and_tag_filters(f, add)
     return [f"coalesce({c}, false)" for c in clauses], params
