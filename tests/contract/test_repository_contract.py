@@ -341,13 +341,13 @@ def test_list_tags(repository: AddonRepository) -> None:
         repository.list_tags(unknown)
 
 
-
 def test_list_anki_versions(repository: AddonRepository) -> None:
     assert repository.list_anki_versions() == ANKI_VERSIONS
     assert repository.list_anki_versions(LATEST) == ANKI_VERSIONS
     assert repository.list_anki_versions(OLD) == []
+    unknown = date(2000, 1, 1)
     with pytest.raises(SnapshotNotFound):
-        repository.list_anki_versions(date(2000, 1, 1))
+        repository.list_anki_versions(unknown)
 
 
 def test_ai_tags_on_cards_and_details(repository: AddonRepository) -> None:
