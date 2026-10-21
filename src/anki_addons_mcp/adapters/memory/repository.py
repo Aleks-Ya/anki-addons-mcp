@@ -12,6 +12,7 @@ from anki_addons_mcp.domain.models import (
     AddonDetails,
     AddonHistoryPoint,
     Aggregation,
+    AnkiRelease,
     AnkiWebInfo,
     GithubInfo,
     GroupField,
@@ -164,7 +165,8 @@ _GROUP_VALUES: dict[GroupField, Callable[[AddonDetails], list[str | None]]] = {
 
 class InMemoryAddonRepository(AddonRepository):
     def __init__(self, snapshots: dict[date, list[AddonDetails]], infos: dict[date, SnapshotInfo] | None = None,
-                 documentation: str = "In-memory Anki addons dataset.", tags: dict[date, list[Tag]] | None = None):
+                 documentation: str = "In-memory Anki addons dataset.", tags: dict[date, list[Tag]] | None = None,
+                 anki_versions: dict[date, list[AnkiRelease]] | None = None):
         if not snapshots:
             raise ValueError("At least one snapshot is required")
         self._snapshots = {d: {a.id: a for a in addons} for d, addons in snapshots.items()}
@@ -172,6 +174,7 @@ class InMemoryAddonRepository(AddonRepository):
         self._infos = infos or {}
         self._documentation = documentation
         self._tags = tags or {}
+        self._anki_versions = anki_versions or {}
 
     def _data(self, snapshot: date | None) -> dict[int, AddonDetails]:
         key = snapshot or self._latest
@@ -263,6 +266,11 @@ class InMemoryAddonRepository(AddonRepository):
         key = snapshot or self._latest
         self._data(key)
         return sorted(self._tags.get(key, []), key=lambda t: (t.group, t.name))
+
+    def list_anki_versions(self, snapshot: date | None = None) -> list[AnkiRelease]:
+        key = snapshot or self._latest
+        self._data(key)
+        return sorted(self._anki_versions.get(key, []), key=lambda r: -r.point_version)
 
     def get_documentation(self) -> str:
         return self._documentation

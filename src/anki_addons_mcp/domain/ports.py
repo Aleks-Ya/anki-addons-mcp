@@ -7,6 +7,7 @@ from anki_addons_mcp.domain.models import (
     AddonDetails,
     AddonHistoryPoint,
     Aggregation,
+    AnkiRelease,
     GroupField,
     Page,
     SnapshotInfo,
@@ -46,6 +47,9 @@ class AddonRepository(ABC):
 
     @abstractmethod
     def list_tags(self, snapshot: date | None = None) -> list[Tag]: ...
+
+    @abstractmethod
+    def list_anki_versions(self, snapshot: date | None = None) -> list[AnkiRelease]: ...
 
     @abstractmethod
     def get_documentation(self) -> str: ...

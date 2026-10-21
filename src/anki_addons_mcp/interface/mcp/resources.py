@@ -7,12 +7,13 @@ from pydantic import BaseModel, TypeAdapter
 from anki_addons_mcp.application.services import Services
 from anki_addons_mcp.application.snapshots import parse_snapshot
 from anki_addons_mcp.application.tags import TagUsage
-from anki_addons_mcp.domain.models import AddonDetails, SnapshotInfo, TextKind
+from anki_addons_mcp.domain.models import AddonDetails, AnkiRelease, SnapshotInfo, TextKind
 from anki_addons_mcp.interface.mcp.errors import parse_addon_id, resource_errors
 
 JSON = "application/json"
 _SNAPSHOTS = TypeAdapter(list[SnapshotInfo])
 _TAGS = TypeAdapter(list[TagUsage])
+_ANKI_RELEASES = TypeAdapter(list[AnkiRelease])
 
 ANKI_VERSIONS_GUIDE = """# Anki versions in the dataset
 
@@ -44,6 +45,12 @@ Anki encodes a version as one sortable integer (as strings, `2.1.66` > `23.10` w
 - `github.manifest`: `min_point_version`/`max_point_version` as the author wrote them (negative max = hard),
   `min_version`, `max_version`, `max_version_kind` parsed. Manifest values are often odd (`260000` gives
   "26.00"), so the AnkiWeb branches are the more reliable source.
+
+## Anki releases
+list_anki_versions (and anki-addons://anki-versions for the latest snapshot) lists the stable Anki releases from
+2.1.0 on as known when the snapshot was collected, newest first: `version` as Anki writes it and its
+`point_version`. Betas and release candidates are left out. query_sql has the same rows as the `anki_versions`
+table. Snapshots collected before the dataset published the list have none.
 
 ## Compatibility verdicts (check_compatibility, compatible_with_anki)
 - supported: a branch covers the version (between min and max, or open-ended).
@@ -144,6 +151,12 @@ def register_resources(mcp: MCPServer, services: Services) -> None:
     def tags() -> str:
         with resource_errors():
             return _TAGS.dump_json(services.tags.vocabulary(), indent=2).decode()
+
+    @mcp.resource("anki-addons://anki-versions", mime_type=JSON,
+                  description="Stable Anki releases from 2.1.0 on, newest first, with point versions (latest snapshot)")
+    def anki_releases() -> str:
+        with resource_errors():
+            return _ANKI_RELEASES.dump_json(services.repository.list_anki_versions(), indent=2).decode()
 
     @mcp.resource("anki-addons://tags/{tag}", mime_type=JSON,
                   description="Addons with an AI tag in the latest snapshot")

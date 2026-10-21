@@ -16,6 +16,7 @@ EXPECTED_TOOLS = {
     "search_addons", "filter_addons", "get_addon", "get_addon_readme", "get_addon_description",
     "check_compatibility", "assess_maintenance", "find_similar_addons", "list_addons_by_author",
     "get_addon_history", "diff_snapshots", "get_statistics", "top_addons", "list_snapshots", "list_tags",
+    "list_anki_versions",
 }
 EXPECTED_PROMPTS = {
     "find_addon_for_task", "compare_addons", "addon_health_report", "upgrade_readiness",
@@ -51,7 +52,7 @@ async def test_lists_prompts_and_resources(client: Client) -> None:
     assert {p.name for p in (await client.list_prompts()).prompts} == EXPECTED_PROMPTS
     assert {str(r.uri) for r in (await client.list_resources()).resources} == {
         "anki-addons://dataset/readme", "anki-addons://dataset/schema", "anki-addons://dataset/anki-versions",
-        "anki-addons://snapshots", "anki-addons://tags"}
+        "anki-addons://snapshots", "anki-addons://tags", "anki-addons://anki-versions"}
     templates = {t.uri_template for t in (await client.list_resource_templates()).resource_templates}
     assert "anki-addons://addons/{addon_id}" in templates
     assert "anki-addons://tags/{tag}" in templates
@@ -99,6 +100,18 @@ async def test_tags(client: Client) -> None:
     unknown = await client.call_tool("filter_addons", {"tags": ["stats"]})
     assert unknown.is_error
     assert "list_tags" in unknown.content[0].text
+
+
+
+async def test_anki_versions(client: Client) -> None:
+    latest = await call(client, "list_anki_versions")
+    assert latest["result"][:2] == [{"version": "26.09.3", "point_version": 260903},
+                                    {"version": "26.09", "point_version": 260900}]
+    assert (await call(client, "list_anki_versions", snapshot=OLD.isoformat()))["result"] == []
+    unknown = await client.call_tool("list_anki_versions", {"snapshot": "2000-01-01"})
+    assert unknown.is_error
+    resource = await client.read_resource("anki-addons://anki-versions")
+    assert json.loads(resource.contents[0].text) == latest["result"]
 
 
 async def test_get_addon_include(client: Client) -> None:

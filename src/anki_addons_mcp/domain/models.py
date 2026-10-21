@@ -254,6 +254,11 @@ class Tag(BaseModel):
     description: str | None = None
 
 
+class AnkiRelease(BaseModel):
+    version: str = Field(description="The version as Anki writes it, e.g. 25.09.2 or 2.1.66")
+    point_version: int = Field(description="Anki's sortable integer encoding: 2.1.x -> x, YY.MM.PP -> YYMMPP")
+
+
 class Page[T](BaseModel):
     items: list[T]
     total: int

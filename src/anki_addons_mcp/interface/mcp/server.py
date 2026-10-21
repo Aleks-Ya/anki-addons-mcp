@@ -20,6 +20,8 @@ Anki Forum and AI-summary and AI-tag data, published as monthly snapshots.
   finds forks of an abandoned addon. Fork detection is incomplete and its 'ai' evidence may be inaccurate.
 - Addons carry AI tags from a fixed vocabulary (list_tags): function tags (what an addon does) and status
   tags (obsolete, paid, beta, ...). Filter with tags/exclude_tags in search_addons and filter_addons.
+- list_anki_versions lists the real Anki releases of a snapshot, newest first: use it to check a version a user
+  mentions or to find the latest Anki before check_compatibility or the compatible_with_anki filter.
 - Every data tool takes an optional snapshot (YYYY-MM-DD from list_snapshots, default latest);
   get_addon_history and diff_snapshots compare snapshots.
 - ai_summary and ai_tags fields are LLM-generated and may be inaccurate.

@@ -7,7 +7,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from anki_addons_mcp.domain.compatibility import point_to_str, to_point
-from anki_addons_mcp.domain.models import AddonDetails, SnapshotInfo, Tag
+from anki_addons_mcp.domain.models import AddonDetails, AnkiRelease, SnapshotInfo, Tag
 
 OLD = date(2026, 9, 1)
 LATEST = date(2026, 10, 1)
@@ -41,6 +41,11 @@ TAGS = [
     Tag(name="obsolete", group="status", description="Built into Anki now, or no longer working"),
     Tag(name="paid", group="status", description="Patreon-only, Pro tiers, subscriptions"),
 ]
+
+# Newest first, as published. The OLD snapshot has no anki_versions file (collected before the table existed).
+ANKI_VERSIONS = [AnkiRelease(version=v, point_version=p) for v, p in [
+    ("26.09.3", 260903), ("26.09", 260900), ("25.02.7", 250207), ("23.10", 231000), ("2.1.66", 66), ("2.1.0", 0),
+]]
 
 
 def _manifest(min_point: int | None, max_point: int | None) -> dict[str, Any]:
@@ -227,16 +232,20 @@ def _metadata(snapshot: date) -> dict[str, str]:
             "report_generation_date": f"{snapshot.isoformat()}T09:30:27", "script_version": "9.9.9"}
 
 
-def _write_snapshot(folder: Path, records: list[dict[str, Any]], snapshot: date) -> None:
+def _write_snapshot(folder: Path, records: list[dict[str, Any]], snapshot: date,
+                    anki_versions: list[AnkiRelease] | None = None) -> None:
     (folder / "parquet").mkdir(parents=True, exist_ok=True)
     pq.write_table(pa.Table.from_pylist(records), folder / "parquet" / "data.parquet", compression="zstd")
     pq.write_table(pa.Table.from_pylist([t.model_dump() for t in TAGS]), folder / "parquet" / "tags.parquet")
+    if anki_versions is not None:
+        pq.write_table(pa.Table.from_pylist([r.model_dump() for r in anki_versions]),
+                       folder / "parquet" / "anki_versions.parquet")
     (folder / "metadata.json").write_text(json.dumps(_metadata(snapshot)))
 
 
 def write_dataset(root: Path) -> Path:
-    _write_snapshot(root / "latest", latest_records(), LATEST)
-    _write_snapshot(root / "history" / LATEST.isoformat(), latest_records(), LATEST)
+    _write_snapshot(root / "latest", latest_records(), LATEST, ANKI_VERSIONS)
+    _write_snapshot(root / "history" / LATEST.isoformat(), latest_records(), LATEST, ANKI_VERSIONS)
     _write_snapshot(root / "history" / OLD.isoformat(), old_records(), OLD)
     (root / "README.md").write_text("# Test dataset card\n")
     return root
@@ -263,3 +272,7 @@ def domain_infos() -> dict[date, SnapshotInfo]:
 
 def domain_tags() -> dict[date, list[Tag]]:
     return {OLD: list(TAGS), LATEST: list(TAGS)}
+
+
+def domain_anki_versions() -> dict[date, list[AnkiRelease]]:
+    return {LATEST: list(ANKI_VERSIONS)}

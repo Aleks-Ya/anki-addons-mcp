@@ -69,12 +69,13 @@ To host your own instance, see [Run over HTTP](README-DEV.md#run-over-http) and
 **Tools** (all read-only, every data tool takes an optional `snapshot`, `YYYY-MM-DD` or `latest`):
 `search_addons`, `filter_addons`, `get_addon`, `get_addon_readme`, `get_addon_description`,
 `check_compatibility`, `assess_maintenance`, `find_similar_addons`, `list_addons_by_author`,
-`get_addon_history`, `diff_snapshots`, `get_statistics`, `top_addons`, `list_snapshots`, `list_tags`, and
-`query_sql` (one sandboxed DuckDB `SELECT` over the `addons` and `tags` tables; only offered by SQL-capable
-backends). `search_addons` accepts every filter of `filter_addons` (including AI tags with `tags` and
+`get_addon_history`, `diff_snapshots`, `get_statistics`, `top_addons`, `list_snapshots`, `list_tags`,
+`list_anki_versions`, and `query_sql` (one sandboxed DuckDB `SELECT` over the `addons`, `tags` and `anki_versions`
+tables; only offered by SQL-capable backends). `search_addons` accepts every filter of `filter_addons` (including AI tags with `tags` and
 `exclude_tags`) and combines them with the text query. Compatibility follows Anki's parsed versions (point versions
 and the `hard`/`tested`/`open`/`unknown` kind of the upper version); both tools filter by `anki_version_kind` and
-`anki_version_at_least`, and `filter_addons` also sorts by `anki_version`.
+`anki_version_at_least`, and `filter_addons` also sorts by `anki_version`. `list_anki_versions` lists the stable
+Anki releases of a snapshot, newest first (empty for snapshots collected before the dataset published them).
 `list_addons_by_author` takes a GitHub user, or an AnkiWeb author by `author_id` or by any of the author's
 addons (`addon_id`). AnkiWeb authors are derived by the dataset and are missing in snapshots collected before
 authors were tracked. `get_addon_description` returns plain text, or the author's unsanitized HTML with
@@ -89,7 +90,8 @@ wrong.
 `anki-addons://dataset/anki-versions`, `anki-addons://snapshots`,
 `anki-addons://snapshots/{snapshot}/metadata`, `anki-addons://snapshots/{snapshot}/aggregation`,
 `anki-addons://addons/{addon_id}` (and `/readme`, `/description`, `/description.html`, `/history`),
-`anki-addons://authors/{github_user}`, `anki-addons://tags`, `anki-addons://tags/{tag}`.
+`anki-addons://authors/{github_user}`, `anki-addons://tags`, `anki-addons://tags/{tag}`,
+`anki-addons://anki-versions`.
 
 **Prompts**: `find_addon_for_task`, `compare_addons`, `addon_health_report`, `upgrade_readiness`,
 `monthly_ecosystem_digest`, `before_you_build`, `author_portfolio`, `best_in_category`, `category_landscape`,

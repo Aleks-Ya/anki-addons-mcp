@@ -102,6 +102,11 @@ TAG_COLUMNS: list[tuple[str, str]] = [
     ("group", "VARCHAR, 'function' (what the addon does) or 'status' (paid, obsolete, beta, ...)"),
     ("description", "VARCHAR, meaning of the tag"),
 ]
+ANKI_VERSIONS_VIEW = "anki_versions"
+ANKI_VERSION_COLUMNS: list[tuple[str, str]] = [
+    ("version", "VARCHAR, the version as Anki writes it, e.g. 25.09.2 or 2.1.66"),
+    ("point_version", "BIGINT, the same encoding as addons.anki_point_version and the branch point versions"),
+]
 _DENIED_FUNCTIONS = frozenset({"getenv", "current_setting"})
 
 
@@ -118,12 +123,23 @@ def tags_select(parquet_path: str) -> str:
     return f"SELECT name, \"group\", description FROM read_parquet('{escaped}')"
 
 
+def anki_versions_select(parquet_path: str | None) -> str:
+    if parquet_path is None:
+        return "SELECT NULL::VARCHAR AS version, NULL::BIGINT AS point_version WHERE false"
+    escaped = parquet_path.replace("'", "''")
+    return f"SELECT version, point_version FROM read_parquet('{escaped}')"
+
+
 def schema_description() -> str:
     lines = [f"- {name}: {desc}" for name, _, desc in FLAT_COLUMNS]
     tag_lines = [f"- {name}: {desc}" for name, desc in TAG_COLUMNS]
+    version_lines = [f"- {name}: {desc}" for name, desc in ANKI_VERSION_COLUMNS]
     return (f"Table `{SQL_VIEW}` (one row per addon of the requested snapshot):\n" + "\n".join(lines)
             + f"\n\nTable `{TAGS_VIEW}` (the tag vocabulary of the snapshot, quote \"group\"):\n"
-            + "\n".join(tag_lines))
+            + "\n".join(tag_lines)
+            + f"\n\nTable `{ANKI_VERSIONS_VIEW}` (the stable Anki releases from 2.1.0 on known when the snapshot was "
+            "collected; empty for snapshots collected before the dataset published it):\n"
+            + "\n".join(version_lines))
 
 
 def _walk(node: Any, ctes: set[str], tables: list[tuple[str, str, str]]) -> None:

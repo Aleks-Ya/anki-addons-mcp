@@ -39,6 +39,20 @@ def test_tags_table(duckdb_repository: DuckDbAddonRepository) -> None:
     assert "ai_tags" in helpers.columns
 
 
+
+def test_anki_versions_table(duckdb_repository: DuckDbAddonRepository) -> None:
+    assert "Table `anki_versions`" in duckdb_repository.sql_schema()
+    latest = duckdb_repository.execute_readonly(
+        "SELECT version, point_version FROM anki_versions ORDER BY point_version DESC LIMIT 2", None, 10, 5)
+    assert latest.rows == [["26.09.3", 260903], ["26.09", 260900]]
+    joined = duckdb_repository.execute_readonly(
+        "SELECT v.version, count(*) FROM addons a JOIN anki_versions v ON v.point_version = a.anki_point_version "
+        "GROUP BY 1 ORDER BY 1", None, 10, 5)
+    assert joined.rows
+    old = duckdb_repository.execute_readonly("SELECT count(*) FROM anki_versions", OLD, 10, 5)
+    assert old.rows == [[0]]
+
+
 @pytest.mark.parametrize(("snapshot", "expected"), [(None, [6, 8, 1]), (OLD, [0, 8, 2])])
 def test_dataset_2_4_columns(duckdb_repository: DuckDbAddonRepository, snapshot: date | None,
                              expected: list[int]) -> None:

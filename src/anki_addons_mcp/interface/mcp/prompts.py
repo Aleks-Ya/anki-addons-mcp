@@ -138,7 +138,9 @@ def register_prompts(mcp: MCPServer) -> None:
     def anki_release_readiness(anki_version: str) -> str:
         return (
             f"Assess how ready the Anki addon ecosystem is for Anki {anki_version}.\n\n"
-            "1. Read anki-addons://dataset/anki-versions if you need the meaning of point versions and kinds.\n"
+            f"1. Call list_anki_versions to confirm that {anki_version} is a real Anki release and to see how it "
+            "compares with the latest one. Read anki-addons://dataset/anki-versions if you need the meaning of "
+            "point versions and kinds.\n"
             "2. Call get_statistics with group_by=['anki_version_kind', 'anki_version'] (top_values 30) for the "
             "overall picture.\n"
             f"3. Call filter_addons with compatible_with_anki={anki_version} (limit 1) for the number of ready "

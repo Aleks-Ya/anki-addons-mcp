@@ -17,6 +17,7 @@ from anki_addons_mcp.application.tags import TagUsage
 from anki_addons_mcp.domain.models import (
     AddonCard,
     AddonDetails,
+    AnkiRelease,
     GroupField,
     Page,
     SnapshotInfo,
@@ -147,7 +148,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         "point versions and the max version kind), with a separate verdict from the GitHub manifest. "
         "Verdicts: supported (a branch covers the version), likely (tested on an older version, newer Anki "
         "still runs it), unsupported (below the minimum, or above a hard limit: Anki disables the addon), "
-        "unknown (no upper version given or no version data). See anki-addons://dataset/anki-versions."))
+        "unknown (no upper version given or no version data). list_anki_versions gives the real Anki versions. "
+        "See anki-addons://dataset/anki-versions."))
     def check_compatibility(addon_ids: Annotated[list[int], Field(min_length=1, max_length=100)],
                             anki_version: Annotated[str, Field(description="e.g. 25.02 or 2.1.66")],
                             snapshot: Snapshot = "latest") -> list[CompatibilityVerdict]:
@@ -230,6 +232,14 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
     def list_tags(snapshot: Snapshot = "latest") -> list[TagUsage]:
         with tool_errors():
             return services.tags.vocabulary(parse_snapshot(snapshot))
+
+    @mcp.tool(annotations=READ_ONLY, description=(
+        "Stable Anki releases from 2.1.0 on as known when the snapshot was collected, newest first (the first is "
+        "the latest Anki), each with its point version. Use it to check a version a user mentions or to find the "
+        "latest Anki. Empty for snapshots collected before the dataset published the list."))
+    def list_anki_versions(snapshot: Snapshot = "latest") -> list[AnkiRelease]:
+        with tool_errors():
+            return services.repository.list_anki_versions(parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description="Available dataset snapshots (monthly) with their metadata.")
     def list_snapshots() -> list[SnapshotInfo]:

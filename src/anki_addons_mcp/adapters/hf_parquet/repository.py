@@ -10,11 +10,13 @@ import duckdb
 from anki_addons_mcp.adapters.hf_parquet.mapping import CARD_COLUMNS, row_to_card, row_to_details
 from anki_addons_mcp.adapters.hf_parquet.source import DatasetSource
 from anki_addons_mcp.adapters.hf_parquet.sql import (
+    ANKI_VERSIONS_VIEW,
     FLAT_COLUMNS,
     HELPER_COLUMNS,
     SEARCH_COLUMNS,
     SQL_VIEW,
     TAGS_VIEW,
+    anki_versions_select,
     flat_select,
     json_safe,
     schema_description,
@@ -29,6 +31,7 @@ from anki_addons_mcp.domain.models import (
     AddonDetails,
     AddonHistoryPoint,
     Aggregation,
+    AnkiRelease,
     GroupField,
     Page,
     SnapshotInfo,
@@ -186,6 +189,7 @@ class _State:
         self.con = duckdb.connect(":memory:")
         self.relations: dict[date, str] = {}
         self.tag_tables: dict[date, str] = {}
+        self.anki_version_tables: dict[date, str] = {}
         self.fts: set[str] = set()
         self.lock = threading.RLock()
         self.fts_available = self._load_fts()
@@ -238,6 +242,21 @@ class _State:
                 self.con.execute(f"CREATE TABLE {name} AS {tags_select(path)}")
                 self.tag_tables[resolved] = name
             return self.tag_tables[resolved]
+
+    def anki_version_table(self, snapshot: date | None) -> str:
+        resolved = snapshot or self.source.latest_date()
+        with self.lock:
+            if resolved in self.anki_version_tables:
+                return self.anki_version_tables[resolved]
+        if resolved not in self.source.snapshot_dates():
+            raise SnapshotNotFound(resolved)
+        path = self.source.anki_versions_file(resolved)
+        with self.lock:
+            if resolved not in self.anki_version_tables:
+                name = f"anki_versions_{resolved.strftime('%Y%m%d')}"
+                self.con.execute(f"CREATE TABLE {name} AS {anki_versions_select(str(path) if path else None)}")
+                self.anki_version_tables[resolved] = name
+            return self.anki_version_tables[resolved]
 
     def _index(self, table: str) -> None:
         if not self.fts_available:
@@ -399,6 +418,16 @@ class DuckDbAddonRepository(AddonRepository):
         finally:
             cursor.close()
 
+    def list_anki_versions(self, snapshot: date | None = None) -> list[AnkiRelease]:
+        state = self._current()
+        table = state.anki_version_table(snapshot)
+        cursor = state.cursor()
+        try:
+            cursor.execute(f"SELECT version, point_version FROM {table} ORDER BY point_version DESC")
+            return [AnkiRelease.model_validate(row) for row in _dicts(cursor)]
+        finally:
+            cursor.close()
+
     def get_documentation(self) -> str:
         return self._current().source.readme() or "Anki addons dataset (no dataset card available)."
 
@@ -409,13 +438,15 @@ class DuckDbAddonRepository(AddonRepository):
         state = self._current()
         relation = state.relation(snapshot)
         tag_table = state.tag_table(snapshot)
+        anki_version_table = state.anki_version_table(snapshot)
         cursor = state.cursor()
         timer = threading.Timer(timeout_seconds, cursor.interrupt)
         try:
-            validate_readonly_select(cursor, sql, {SQL_VIEW, TAGS_VIEW})
+            validate_readonly_select(cursor, sql, {SQL_VIEW, TAGS_VIEW, ANKI_VERSIONS_VIEW})
             helpers = ", ".join(HELPER_COLUMNS)
             cursor.execute(f"CREATE OR REPLACE TEMP VIEW {SQL_VIEW} AS SELECT * EXCLUDE ({helpers}) FROM {relation}")
             cursor.execute(f"CREATE OR REPLACE TEMP VIEW {TAGS_VIEW} AS SELECT * FROM {tag_table}")
+            cursor.execute(f"CREATE OR REPLACE TEMP VIEW {ANKI_VERSIONS_VIEW} AS SELECT * FROM {anki_version_table}")
             timer.start()
             try:
                 cursor.execute(sql)
