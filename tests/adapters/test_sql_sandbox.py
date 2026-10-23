@@ -87,7 +87,7 @@ def test_timeout(duckdb_repository: DuckDbAddonRepository) -> None:
     with pytest.raises(InvalidQuery, match="time limit"):
         duckdb_repository.execute_readonly(
             "SELECT count(*) FROM addons a, addons b, addons c, addons d, addons e, addons f, addons g, addons h, "
-            "addons i, addons j WHERE a.id + b.id + c.id + d.id + e.id + f.id + g.id + h.id + i.id + j.id < 0",
+            "addons i, addons j WHERE hash(a.id, b.id, c.id, d.id, e.id, f.id, g.id, h.id, i.id, j.id) = 0",
             None, 3, 0.2)
 
 
