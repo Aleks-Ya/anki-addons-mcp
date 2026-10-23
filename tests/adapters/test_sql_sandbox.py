@@ -66,14 +66,14 @@ def test_dataset_2_4_columns(duckdb_repository: DuckDbAddonRepository, snapshot:
 def test_dataset_2_5_columns(duckdb_repository: DuckDbAddonRepository, snapshot: date | None,
                              expected: list[int]) -> None:
     result = duckdb_repository.execute_readonly(
-        "SELECT count_if(len(forked_from) > 0), count_if(len(forks) > 0), count(github_fork_source) FROM addons",
+        "SELECT count(forked_from), count_if(len(forks) > 0), count(github_fork_source) FROM addons",
         snapshot, 10, 5)
     assert result.rows == [expected]
 
 
 def test_fork_evidence_column(duckdb_repository: DuckDbAddonRepository) -> None:
     result = duckdb_repository.execute_readonly(
-        "SELECT r.id, r.evidence FROM (SELECT unnest(forked_from) AS r FROM addons) ORDER BY 1", None, 10, 5)
+        "SELECT forked_from.id, forked_from.evidence FROM addons WHERE forked_from IS NOT NULL ORDER BY 1", None, 10, 5)
     assert result.rows == [[KANJI, "github_fork"], [LEGACY, "ai"]]
 
 

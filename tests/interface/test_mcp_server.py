@@ -198,9 +198,9 @@ async def test_filter_by_author_id(client: Client) -> None:
 async def test_fork_filters_and_details(client: Client) -> None:
     page = await call(client, "filter_addons", fork_of=KANJI)
     assert [item["id"] for item in page["items"]] == [NEW_ADDON]
-    assert page["items"][0]["forked_from"] == [KANJI]
+    assert page["items"][0]["forked_from"] == KANJI
     details = await call(client, "get_addon", addon_id=NEW_ADDON)
-    assert details["forked_from"] == [{"id": KANJI, "evidence": "github_fork"}]
+    assert details["forked_from"] == {"id": KANJI, "evidence": "github_fork"}
     assert details["github"]["fork_source"] == "alice/kanji-helper"
     forks = await call(client, "search_addons", query="kanji", has_forks=True)
     assert [item["id"] for item in forks["items"]] == [KANJI]

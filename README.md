@@ -80,8 +80,9 @@ Anki releases of a snapshot, newest first (empty for snapshots collected before 
 addons (`addon_id`). AnkiWeb authors are derived by the dataset and are missing in snapshots collected before
 authors were tracked. `get_addon_description` returns plain text, or the author's unsanitized HTML with
 `format=html`.
-Fork relations come from the dataset: `get_addon` shows `forked_from` (with its evidence: `github_fork`, `ai` or
-`override`), `forks` and `github.fork_source`; cards carry the ids. `search_addons` and `filter_addons` filter by
+Fork relations come from the dataset: `get_addon` shows `forked_from`, the one addon it was forked from or null
+(with its evidence: `github_fork`, `ai` or `override`), `forks` (any number) and `github.fork_source`; cards carry
+the ids. `search_addons` and `filter_addons` filter by
 `is_fork`, `has_forks` and `fork_of` (the forks of one addon, e.g. a maintained fork of an abandoned addon);
 `find_similar_addons` and `assess_maintenance` point to them. Detection is incomplete and `ai` evidence may be
 wrong.

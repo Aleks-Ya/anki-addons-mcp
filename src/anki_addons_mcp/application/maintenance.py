@@ -32,7 +32,7 @@ class MaintenanceSignals(BaseModel):
     forum_posts_count: int | None
     last_activity: date | None
     days_since_last_activity: int | None
-    forked_from: list[int] = Field(default_factory=list, description="Addons this one was forked from")
+    forked_from: int | None = Field(default=None, description="Addon this one was forked from")
     forks: list[int] = Field(default_factory=list, description="Addons forked from this one")
 
 
@@ -87,7 +87,7 @@ class MaintenanceService:
             forum_posts_count=forum.posts_count if forum else None,
             last_activity=last_activity,
             days_since_last_activity=days,
-            forked_from=[relation.id for relation in details.forked_from],
+            forked_from=details.forked_from.id if details.forked_from else None,
             forks=list(details.forks),
         )
         label, reasons = self._label(signals)

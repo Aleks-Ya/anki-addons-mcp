@@ -82,7 +82,7 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
           github: dict[str, Any] | None = None, forum: dict[str, Any] | None = None,
           ai_summary: str | None = None, ai_tags: list[str] | None = None,
           author_addons: list[int] | None = None,
-          forked_from: list[tuple[int, str]] | None = None) -> dict[str, Any]:
+          forked_from: tuple[int, str] | None = None) -> dict[str, Any]:
     point_version, version_kind = _addons_list_version(anki_version)
     group = author_addons or [addon_id]
     return {
@@ -114,7 +114,7 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
         "forum": forum,
         "ai": {"summary": ai_summary, "model": "test-model", "tags": ai_tags or []} if ai_summary or ai_tags else None,
         "author": {"id": min(group), "addon_count": len(group)},
-        "forked_from": [{"id": parent, "evidence": evidence} for parent, evidence in forked_from or []],
+        "forked_from": {"id": forked_from[0], "evidence": forked_from[1]} if forked_from else None,
         "forks": [],
     }
 
@@ -125,9 +125,9 @@ def _link_forks(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for record in by_id.values():
         record["forks"] = []
     for record in sorted(records, key=lambda r: r["id"]):
-        for relation in record["forked_from"]:
-            if relation["id"] in by_id:
-                by_id[relation["id"]]["forks"].append(record["id"])
+        relation = record["forked_from"]
+        if relation and relation["id"] in by_id:
+            by_id[relation["id"]]["forks"].append(record["id"])
     return records
 
 
@@ -193,12 +193,12 @@ def latest_records() -> list[dict[str, Any]]:
         addon(VIBE, "Vibe Deck Tools", rating=4, likes=3, dislikes=1, update_date="2026-09-29",
               anki_version="25.09~", branches=[("25.09", "+")], description="Deck tools vibe-coded with claude.",
               ai_declaration=["claude", "vibe-coded"], ai_tags=["deck-management", "beta"],
-              forked_from=[(LEGACY, "ai")],
+              forked_from=(LEGACY, "ai"),
               github=github("erin", "vibe-deck", stars=1, last_commit="2026-09-28T12:00:00", license="MIT",
                             ai_tooling=["claude-code", "agents-md"], topics=["deck"], repo_source="ai")),
         addon(NEW_ADDON, "Kanji Quiz", rating=10, likes=10, update_date="2026-09-25", anki_version="25.02~",
               branches=[("25.02", "+")], description="Quiz yourself on kanji meanings.",
-              ai_summary="Kanji meaning quiz.", ai_tags=["quiz", "dictionary"], forked_from=[(KANJI, "github_fork")],
+              ai_summary="Kanji meaning quiz.", ai_tags=["quiz", "dictionary"], forked_from=(KANJI, "github_fork"),
               github=github("frank", "kanji-quiz", stars=5, topics=["kanji", "quiz"],
                             fork_source="alice/kanji-helper")),
         addon(SAME_AUTHOR, "Alice Utilities", rating=42, likes=41, dislikes=1, update_date="2026-05-05",

@@ -114,18 +114,19 @@ def test_author_filter_in_snapshot_without_authors(repository: AddonRepository) 
 def test_forks_in_details(repository: AddonRepository) -> None:
     fork = repository.get_addon(NEW_ADDON)
     assert fork is not None
-    assert [(r.id, r.evidence) for r in fork.forked_from] == [(KANJI, ForkEvidence.GITHUB_FORK)]
+    assert fork.forked_from is not None
+    assert (fork.forked_from.id, fork.forked_from.evidence) == (KANJI, ForkEvidence.GITHUB_FORK)
     assert fork.github is not None
     assert fork.github.fork_source == "alice/kanji-helper"
     parent = repository.get_addon(KANJI)
     assert parent is not None
-    assert (parent.forked_from, parent.forks) == ([], [NEW_ADDON])
+    assert (parent.forked_from, parent.forks) == (None, [NEW_ADDON])
 
 
 def test_forks_on_cards(repository: AddonRepository) -> None:
     cards = {c.id: c for c in repository.find(AddonQuery(filters=AddonFilters(addon_ids=[VIBE, LEGACY]))).items}
-    assert (cards[VIBE].forked_from, cards[VIBE].forks) == ([LEGACY], [])
-    assert (cards[LEGACY].forked_from, cards[LEGACY].forks) == ([], [VIBE])
+    assert (cards[VIBE].forked_from, cards[VIBE].forks) == (LEGACY, [])
+    assert (cards[LEGACY].forked_from, cards[LEGACY].forks) == (None, [VIBE])
 
 
 def test_forks_in_old_snapshot(repository: AddonRepository) -> None:

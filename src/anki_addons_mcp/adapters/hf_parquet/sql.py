@@ -47,7 +47,8 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("author_addon_count", "CAST(json_extract(to_json(author), '$.addon_count') AS BIGINT)",
      "BIGINT, number of the author's addons in the snapshot"),
     ("forked_from", "forked_from",
-     ("STRUCT(id BIGINT, evidence VARCHAR)[], addons this one was forked from; evidence 'github_fork', "
+     ("STRUCT(id BIGINT, evidence VARCHAR), the addon this one was forked from or NULL (at most one); "
+      "evidence 'github_fork', "
       "'ai' (LLM-detected, may be inaccurate) or 'override'; detection is incomplete")),
     ("forks", "forks", "BIGINT[], addons forked from this one (the reverse of forked_from)"),
     ("has_github", "github IS NOT NULL", "BOOLEAN"),

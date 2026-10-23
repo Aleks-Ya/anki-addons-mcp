@@ -89,8 +89,9 @@ class SimilarityService:
     def _add_fork_relations(self, target: AddonDetails, scored: dict[int, SimilarAddon],
                             snapshot: date | None) -> None:
         reasons = {fork: "forked from this addon" for fork in target.forks if fork != target.id}
-        reasons.update({relation.id: f"this addon is a fork of it ({relation.evidence} evidence)"
-                        for relation in target.forked_from if relation.id != target.id})
+        parent = target.forked_from
+        if parent is not None and parent.id != target.id:
+            reasons[parent.id] = f"this addon is a fork of it ({parent.evidence} evidence)"
         missing = [addon_id for addon_id in reasons if addon_id not in scored]
         if missing:
             cards = self._repository.find(

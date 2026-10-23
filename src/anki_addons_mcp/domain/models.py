@@ -179,7 +179,8 @@ class AddonDetails(BaseModel):
     forum: ForumInfo | None = None
     ai: AiInfo | None = None
     author: AuthorInfo | None = None
-    forked_from: list[ForkRelation] = Field(default_factory=list, description=FORK_DESCRIPTION)
+    forked_from: ForkRelation | None = Field(
+        default=None, description="The addon this one was forked from; an addon has at most one. " + FORK_DESCRIPTION)
     forks: list[int] = Field(default_factory=list, description="Addons forked from this one. " + FORK_DESCRIPTION)
     description: str | None = None
     description_html: str | None = None
@@ -210,7 +211,7 @@ class AddonCard(BaseModel):
     forum_posts_count: int | None = None
     ai_tags: list[str] = Field(default_factory=list, description=AI_PROVENANCE)
     author_id: int | None = Field(default=None, description=AUTHOR_ID_DESCRIPTION)
-    forked_from: list[int] = Field(default_factory=list, description="Addons this one was forked from")
+    forked_from: int | None = Field(default=None, description="Addon this one was forked from")
     forks: list[int] = Field(default_factory=list, description="Addons forked from this one")
     score: float | None = None
 
@@ -242,7 +243,7 @@ class AddonCard(BaseModel):
             forum_posts_count=details.forum.posts_count if details.forum else None,
             ai_tags=list(details.ai.tags) if details.ai else [],
             author_id=details.author.id if details.author else None,
-            forked_from=[relation.id for relation in details.forked_from],
+            forked_from=details.forked_from.id if details.forked_from else None,
             forks=list(details.forks),
             score=score,
         )

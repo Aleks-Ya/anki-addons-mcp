@@ -59,11 +59,11 @@ def _anki_web_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
 def _fork_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
     checks: list[bool] = []
     if f.is_fork is not None:
-        checks.append(bool(d.forked_from) == f.is_fork)
+        checks.append((d.forked_from is not None) == f.is_fork)
     if f.has_forks is not None:
         checks.append(bool(d.forks) == f.has_forks)
     if f.fork_of is not None:
-        checks.append(any(relation.id == f.fork_of for relation in d.forked_from))
+        checks.append(d.forked_from is not None and d.forked_from.id == f.fork_of)
     return checks
 
 
