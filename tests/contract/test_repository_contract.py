@@ -106,8 +106,9 @@ def test_list_reviews_by_snapshot(repository: AddonRepository) -> None:
     assert repository.list_reviews(KANJI, ReviewQuery(), OLD).total == 2
     empty = repository.list_reviews(HEATMAP, ReviewQuery())
     assert (empty.items, empty.total, empty.likes, empty.dislikes) == ([], 0, 0, 0)
+    query, unknown = ReviewQuery(), date(2000, 1, 1)
     with pytest.raises(SnapshotNotFound):
-        repository.list_reviews(KANJI, ReviewQuery(), date(2000, 1, 1))
+        repository.list_reviews(KANJI, query, unknown)
 
 
 def test_get_addon_missing(repository: AddonRepository) -> None:

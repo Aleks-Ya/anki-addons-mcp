@@ -89,12 +89,14 @@ def test_get_missing(services: Services) -> None:
 
 def test_reviews(services: Services) -> None:
     assert services.catalog.reviews(KANJI, ReviewQuery(limit=1)).total == 5
+    query = ReviewQuery()
     with pytest.raises(AddonNotFound):
-        services.catalog.reviews(424242, ReviewQuery())
+        services.catalog.reviews(424242, query)
     with pytest.raises(AddonNotFound):
-        services.catalog.reviews(NEW_ADDON, ReviewQuery(), OLD)
+        services.catalog.reviews(NEW_ADDON, query, OLD)
+    too_many = ReviewQuery(limit=101)
     with pytest.raises(InvalidQuery):
-        services.catalog.reviews(KANJI, ReviewQuery(limit=101))
+        services.catalog.reviews(KANJI, too_many)
 
 
 def test_text_truncation(services: Services) -> None:
