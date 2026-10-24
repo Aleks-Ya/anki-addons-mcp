@@ -159,8 +159,10 @@ class ForkService:
                 continue
             seen.add(details.id)
             ordered.append((details, depth))
-            children = sorted((found[f] for f in details.forks if f in found and f not in seen), key=order)
-            stack.extend((child, depth + 1) for child in reversed(children))
+            # Pushed last-first, so the stack pops the forks in order.
+            children = sorted((found[f] for f in details.forks if f in found and f not in seen), key=order,
+                              reverse=True)
+            stack.extend((child, depth + 1) for child in children)
         return ordered
 
     def _target(self, anki_version: str | None, snapshot: date | None,
