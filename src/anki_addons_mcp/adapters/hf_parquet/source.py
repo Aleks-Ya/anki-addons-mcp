@@ -15,6 +15,7 @@ HISTORY_DIR = "history"
 DATA_FILE = "parquet/data.parquet"
 TAGS_FILE = "parquet/tags.parquet"
 ANKI_VERSIONS_FILE = "parquet/anki_versions.parquet"
+REVIEWS_FILE = "parquet/reviews.parquet"
 METADATA_FILE = "metadata.json"
 README_FILE = "README.md"
 
@@ -34,6 +35,8 @@ class DatasetSource(Protocol):
     def data_file(self, snapshot: date) -> Path: ...
 
     def tags_file(self, snapshot: date) -> Path: ...
+
+    def reviews_file(self, snapshot: date) -> Path: ...
 
     def anki_versions_file(self, snapshot: date) -> Path | None:
         """None for a snapshot collected before the dataset published the table."""
@@ -136,6 +139,9 @@ class LocalDatasetSource(_BaseSource):
     def tags_file(self, snapshot: date) -> Path:
         return self._root / self._snapshot_relative(snapshot, TAGS_FILE)
 
+    def reviews_file(self, snapshot: date) -> Path:
+        return self._root / self._snapshot_relative(snapshot, REVIEWS_FILE)
+
     def anki_versions_file(self, snapshot: date) -> Path | None:
         path = self._root / self._snapshot_relative(snapshot, ANKI_VERSIONS_FILE)
         return path if path.is_file() else None
@@ -196,6 +202,9 @@ class HfDatasetSource(_BaseSource):
 
     def tags_file(self, snapshot: date) -> Path:
         return self._download(self._snapshot_relative(snapshot, TAGS_FILE))
+
+    def reviews_file(self, snapshot: date) -> Path:
+        return self._download(self._snapshot_relative(snapshot, REVIEWS_FILE))
 
     def anki_versions_file(self, snapshot: date) -> Path | None:
         from huggingface_hub.errors import EntryNotFoundError

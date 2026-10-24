@@ -122,6 +122,7 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
             topic_id=row["forum_topic_id"],
             last_posted_at=row["forum_last_posted_at"],
             posts_count=row["forum_posts_count"],
+            topic_source=row["forum_topic_source"],
         )
     tags = _list(row["ai_tags"])
     has_ai = row["ai_summary"] or row["ai_model"] or tags

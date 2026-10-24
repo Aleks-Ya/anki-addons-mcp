@@ -69,9 +69,9 @@ To host your own instance, see [Run over HTTP](README-DEV.md#run-over-http) and
 **Tools** (all read-only, every data tool takes an optional `snapshot`, `YYYY-MM-DD` or `latest`):
 `search_addons`, `filter_addons`, `get_addon`, `get_addon_readme`, `get_addon_description`,
 `check_compatibility`, `assess_maintenance`, `compare_forks`, `find_similar_addons`, `list_addons_by_author`,
-`get_addon_history`, `diff_snapshots`, `get_statistics`, `top_addons`, `list_snapshots`, `list_tags`,
-`list_anki_versions`, and `query_sql` (one sandboxed DuckDB `SELECT` over the `addons`, `tags` and `anki_versions`
-tables; only offered by SQL-capable backends). `search_addons` accepts every filter of `filter_addons` (including AI tags with `tags` and
+`get_addon_reviews`, `get_addon_history`, `diff_snapshots`, `get_statistics`, `top_addons`, `list_snapshots`,
+`list_tags`, `list_anki_versions`, and `query_sql` (one sandboxed DuckDB `SELECT` over the `addons`, `tags`,
+`anki_versions` and `reviews` tables; only offered by SQL-capable backends). `search_addons` accepts every filter of `filter_addons` (including AI tags with `tags` and
 `exclude_tags`) and combines them with the text query. Compatibility follows Anki's parsed versions (point versions
 and the `hard`/`tested`/`open`/`unknown` kind of the upper version); both tools filter by `anki_version_kind` and
 `anki_version_at_least`, and `filter_addons` also sorts by `anki_version`. `list_anki_versions` lists the stable
@@ -79,7 +79,10 @@ Anki releases of a snapshot, newest first (empty for snapshots collected before 
 `list_addons_by_author` takes a GitHub user, or an AnkiWeb author by `author_id` or by any of the author's
 addons (`addon_id`). AnkiWeb authors are derived by the dataset and are missing in snapshots collected before
 authors were tracked. `get_addon_description` returns plain text, or the author's unsanitized HTML with
-`format=html`.
+`format=html`. `get_addon_reviews` lists an addon's AnkiWeb user reviews newest first (anonymous, with the
+author's reply when there is one) and filters them by `vote`, `contains` text and `since` date, e.g. to find reports
+of breakage on a new Anki. `get_addon` shows how the Anki Forum topic was found in `forum.topic_source`
+(`override`, `contact_author`, `ai` or `most_linked`).
 Fork relations come from the dataset: `get_addon` shows `forked_from`, the one addon it was forked from or null
 (with its evidence: `github_fork`, `ai` or `override`), `forks` (any number) and `github.fork_source`; cards carry
 the ids. `search_addons` and `filter_addons` filter by
@@ -92,7 +95,7 @@ flags, without picking a winner. Detection is incomplete and `ai` evidence may b
 **Resources**: `anki-addons://dataset/readme`, `anki-addons://dataset/schema`,
 `anki-addons://dataset/anki-versions`, `anki-addons://snapshots`,
 `anki-addons://snapshots/{snapshot}/metadata`, `anki-addons://snapshots/{snapshot}/aggregation`,
-`anki-addons://addons/{addon_id}` (and `/readme`, `/description`, `/description.html`, `/history`),
+`anki-addons://addons/{addon_id}` (and `/readme`, `/description`, `/description.html`, `/reviews`, `/history`),
 `anki-addons://authors/{github_user}`, `anki-addons://tags`, `anki-addons://tags/{tag}`,
 `anki-addons://anki-versions`.
 

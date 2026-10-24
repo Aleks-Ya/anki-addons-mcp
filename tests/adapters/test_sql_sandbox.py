@@ -53,6 +53,19 @@ def test_anki_versions_table(duckdb_repository: DuckDbAddonRepository) -> None:
     assert old.rows == [[0]]
 
 
+def test_reviews_table(duckdb_repository: DuckDbAddonRepository) -> None:
+    assert "Table `reviews`" in duckdb_repository.sql_schema()
+    counts = duckdb_repository.execute_readonly(
+        "SELECT a.title, r.vote, count(*) FROM reviews r JOIN addons a ON a.id = r.addon_id GROUP BY ALL "
+        "ORDER BY ALL", None, 10, 5)
+    assert counts.rows == [["Image Occlusion Plus", "like", 1], ["Kanji Helper", "dislike", 2],
+                           ["Kanji Helper", "like", 3]]
+    columns = duckdb_repository.execute_readonly("SELECT * FROM reviews LIMIT 1", None, 10, 5).columns
+    assert columns == ["addon_id", "date", "vote", "text", "author_reply"]
+    old = duckdb_repository.execute_readonly("SELECT count(*) FROM reviews", OLD, 10, 5)
+    assert old.rows == [[3]]
+
+
 @pytest.mark.parametrize(("snapshot", "expected"), [(None, [6, 8, 1]), (OLD, [0, 8, 2])])
 def test_dataset_2_4_columns(duckdb_repository: DuckDbAddonRepository, snapshot: date | None,
                              expected: list[int]) -> None:

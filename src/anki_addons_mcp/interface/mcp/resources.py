@@ -8,6 +8,7 @@ from anki_addons_mcp.application.services import Services
 from anki_addons_mcp.application.snapshots import parse_snapshot
 from anki_addons_mcp.application.tags import TagUsage
 from anki_addons_mcp.domain.models import AddonDetails, AnkiRelease, SnapshotInfo, TextKind
+from anki_addons_mcp.domain.query import ReviewQuery
 from anki_addons_mcp.interface.mcp.errors import parse_addon_id, resource_errors
 
 JSON = "application/json"
@@ -133,6 +134,12 @@ def register_resources(mcp: MCPServer, services: Services) -> None:
         if text is None:
             raise ResourceNotFoundError(f"Addon {addon_id} has no HTML description")
         return text
+
+    @mcp.resource("anki-addons://addons/{addon_id}/reviews", mime_type=JSON,
+                  description="The 50 newest AnkiWeb reviews of an addon in the latest snapshot")
+    def addon_reviews(addon_id: str) -> str:
+        with resource_errors():
+            return _json(catalog.reviews(parse_addon_id(addon_id), ReviewQuery(limit=50)))
 
     @mcp.resource("anki-addons://addons/{addon_id}/history", mime_type=JSON,
                   description="Rating, likes and stars of an addon across snapshots")

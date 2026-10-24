@@ -7,7 +7,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from anki_addons_mcp.domain.compatibility import point_to_str, to_point
-from anki_addons_mcp.domain.models import AddonDetails, AnkiRelease, SnapshotInfo, Tag
+from anki_addons_mcp.domain.models import AddonDetails, AddonReview, AnkiRelease, ReviewVote, SnapshotInfo, Tag
 
 OLD = date(2026, 9, 1)
 LATEST = date(2026, 10, 1)
@@ -46,6 +46,25 @@ TAGS = [
 ANKI_VERSIONS = [AnkiRelease(version=v, point_version=p) for v, p in [
     ("26.09.3", 260903), ("26.09", 260900), ("25.02.7", 250207), ("23.10", 231000), ("2.1.66", 66), ("2.1.0", 0),
 ]]
+
+# Per addon newest first, as published; the three reviews of 2026-09-25 pin the order of same-day reviews.
+_LIKE, _DISLIKE = ReviewVote.LIKE, ReviewVote.DISLIKE
+LATEST_REVIEWS: dict[int, list[AddonReview]] = {
+    KANJI: [AddonReview(date=date(*d), vote=v, text=t, author_reply=r) for d, v, t, r in [
+        ((2026, 9, 25), _LIKE, "Great for kanji study.", None),
+        ((2026, 9, 25), _DISLIKE, "Crashes on Anki 25.09 when reviewing.", "Fixed in the next VERSION."),
+        ((2026, 9, 25), _LIKE, "", None),
+        ((2026, 3, 1), _LIKE, "Stroke order works well.", None),
+        ((2025, 1, 10), _DISLIKE, "Too slow.", None),
+    ]],
+    OCCLUSION: [AddonReview(date=date(2026, 7, 1), vote=_LIKE, text="Essential for anatomy.")],
+}
+_REVIEW_SCHEMA = pa.schema([("addon_id", pa.int64()), ("date", pa.date32()), ("vote", pa.large_string()),
+                            ("text", pa.large_string()), ("author_reply", pa.large_string())])
+
+
+def reviews_at(snapshot: date) -> dict[int, list[AddonReview]]:
+    return {addon_id: [r for r in reviews if r.date < snapshot] for addon_id, reviews in LATEST_REVIEWS.items()}
 
 
 def _manifest(min_point: int | None, max_point: int | None) -> dict[str, Any]:
@@ -151,9 +170,10 @@ def github(user: str, repo: str, *, stars: int = 0, last_commit: str | None = "2
     }
 
 
-def forum(topic_id: int, posts: int) -> dict[str, Any]:
+def forum(topic_id: int, posts: int, topic_source: str = "contact_author") -> dict[str, Any]:
     return {"anki_forum_url": f"https://forums.ankiweb.net/t/topic/{topic_id}", "topic_slug": "topic",
-            "topic_id": topic_id, "last_posted_at": "2026-09-15 10:00:00+00:00", "posts_count": posts}
+            "topic_id": topic_id, "last_posted_at": "2026-09-15 10:00:00+00:00", "posts_count": posts,
+            "topic_source": topic_source}
 
 
 def latest_records() -> list[dict[str, Any]]:
@@ -176,7 +196,7 @@ def latest_records() -> list[dict[str, Any]]:
               github=github("bob", "image-occlusion", stars=500, tests=40, actions=3, license="GPL-3.0",
                             languages=["Python", "JavaScript"], topics=["image", "occlusion"],
                             manifest=_manifest(66, -250900), readme="# Image Occlusion\nOcclude images."),
-              forum=forum(22, 120)),
+              forum=forum(22, 120, topic_source="ai")),
         addon(HEATMAP, "Review Heatmap", rating=84, likes=82, dislikes=2, update_date="2024-01-10",
               anki_version="<=2.1.54", branches=[("2.1.20", "2.1.54")],
               description="Heatmap of review history with streak counter.",
@@ -239,6 +259,9 @@ def _write_snapshot(folder: Path, records: list[dict[str, Any]], snapshot: date,
     (folder / "parquet").mkdir(parents=True, exist_ok=True)
     pq.write_table(pa.Table.from_pylist(records), folder / "parquet" / "data.parquet", compression="zstd")
     pq.write_table(pa.Table.from_pylist([t.model_dump() for t in TAGS]), folder / "parquet" / "tags.parquet")
+    reviews = [{"addon_id": addon_id, **r.model_dump()} for addon_id, rs in sorted(reviews_at(snapshot).items())
+               for r in rs]
+    pq.write_table(pa.Table.from_pylist(reviews, schema=_REVIEW_SCHEMA), folder / "parquet" / "reviews.parquet")
     if anki_versions is not None:
         pq.write_table(pa.Table.from_pylist([r.model_dump() for r in anki_versions]),
                        folder / "parquet" / "anki_versions.parquet")
@@ -278,3 +301,7 @@ def domain_tags() -> dict[date, list[Tag]]:
 
 def domain_anki_versions() -> dict[date, list[AnkiRelease]]:
     return {LATEST: list(ANKI_VERSIONS)}
+
+
+def domain_reviews() -> dict[date, dict[int, list[AddonReview]]]:
+    return {d: reviews_at(d) for d in (OLD, LATEST)}

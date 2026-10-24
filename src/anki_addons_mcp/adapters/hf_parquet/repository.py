@@ -13,12 +13,15 @@ from anki_addons_mcp.adapters.hf_parquet.sql import (
     ANKI_VERSIONS_VIEW,
     FLAT_COLUMNS,
     HELPER_COLUMNS,
+    REVIEW_SEQ,
+    REVIEWS_VIEW,
     SEARCH_COLUMNS,
     SQL_VIEW,
     TAGS_VIEW,
     anki_versions_select,
     flat_select,
     json_safe,
+    reviews_select,
     schema_description,
     tags_select,
     validate_readonly_select,
@@ -30,6 +33,8 @@ from anki_addons_mcp.domain.models import (
     AddonCard,
     AddonDetails,
     AddonHistoryPoint,
+    AddonReview,
+    AddonReviews,
     Aggregation,
     AnkiRelease,
     GroupField,
@@ -40,7 +45,7 @@ from anki_addons_mcp.domain.models import (
     TextKind,
 )
 from anki_addons_mcp.domain.ports import AddonRepository
-from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, SortField
+from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, ReviewQuery, SortField
 
 log = logging.getLogger(__name__)
 
@@ -190,6 +195,7 @@ class _State:
         self.relations: dict[date, str] = {}
         self.tag_tables: dict[date, str] = {}
         self.anki_version_tables: dict[date, str] = {}
+        self.review_tables: dict[date, str] = {}
         self.fts: set[str] = set()
         self.lock = threading.RLock()
         self.fts_available = self._load_fts()
@@ -257,6 +263,21 @@ class _State:
                 self.con.execute(f"CREATE TABLE {name} AS {anki_versions_select(str(path) if path else None)}")
                 self.anki_version_tables[resolved] = name
             return self.anki_version_tables[resolved]
+
+    def review_table(self, snapshot: date | None) -> str:
+        resolved = snapshot or self.source.latest_date()
+        with self.lock:
+            if resolved in self.review_tables:
+                return self.review_tables[resolved]
+        if resolved not in self.source.snapshot_dates():
+            raise SnapshotNotFound(resolved)
+        path = str(self.source.reviews_file(resolved))
+        with self.lock:
+            if resolved not in self.review_tables:
+                name = f"reviews_{resolved.strftime('%Y%m%d')}"
+                self.con.execute(f"CREATE TABLE {name} AS {reviews_select(path)}")
+                self.review_tables[resolved] = name
+            return self.review_tables[resolved]
 
     def _index(self, table: str) -> None:
         if not self.fts_available:
@@ -388,6 +409,38 @@ class DuckDbAddonRepository(AddonRepository):
             ))
         return points
 
+    def list_reviews(self, addon_id: int, query: ReviewQuery, snapshot: date | None = None) -> AddonReviews:
+        state = self._current()
+        table = state.review_table(snapshot)
+        filters: list[str] = []
+        params: list[Any] = []
+        if query.vote is not None:
+            filters.append("vote = ?")
+            params.append(query.vote.value)
+        if query.since is not None:
+            filters.append("date >= ?")
+            params.append(query.since)
+        contains = query.contains_text()
+        if contains is not None:
+            filters.append("contains(lower(concat_ws(' ', text, author_reply)), ?)")
+            params.append(contains)
+        matching = " AND ".join(filters) or "true"
+        cursor = state.cursor()
+        try:
+            cursor.execute(f"SELECT count(*) FILTER (WHERE {matching}) AS total, "
+                           "count(*) FILTER (WHERE vote = 'like') AS likes, "
+                           f"count(*) FILTER (WHERE vote = 'dislike') AS dislikes FROM {table} WHERE addon_id = ?",
+                           [*params, addon_id])
+            counts = _dicts(cursor)[0]
+            cursor.execute(f"SELECT date, vote, text, author_reply FROM {table} WHERE addon_id = ? AND {matching} "
+                           f"ORDER BY date DESC, {REVIEW_SEQ} LIMIT {int(query.limit)} OFFSET {int(query.offset)}",
+                           [addon_id, *params])
+            items = [AddonReview.model_validate(row) for row in _dicts(cursor)]
+        finally:
+            cursor.close()
+        return AddonReviews(addon_id=addon_id, total=counts["total"], likes=counts["likes"],
+                            dislikes=counts["dislikes"], offset=query.offset, limit=query.limit, items=items)
+
     def get_aggregation(self, snapshot: date | None = None) -> Aggregation:
         row = self._select(
             "SELECT count(*) AS addon_number, count_if(has_github) AS addon_with_github_number, "
@@ -439,14 +492,17 @@ class DuckDbAddonRepository(AddonRepository):
         relation = state.relation(snapshot)
         tag_table = state.tag_table(snapshot)
         anki_version_table = state.anki_version_table(snapshot)
+        review_table = state.review_table(snapshot)
         cursor = state.cursor()
         timer = threading.Timer(timeout_seconds, cursor.interrupt)
         try:
-            validate_readonly_select(cursor, sql, {SQL_VIEW, TAGS_VIEW, ANKI_VERSIONS_VIEW})
+            validate_readonly_select(cursor, sql, {SQL_VIEW, TAGS_VIEW, ANKI_VERSIONS_VIEW, REVIEWS_VIEW})
             helpers = ", ".join(HELPER_COLUMNS)
             cursor.execute(f"CREATE OR REPLACE TEMP VIEW {SQL_VIEW} AS SELECT * EXCLUDE ({helpers}) FROM {relation}")
             cursor.execute(f"CREATE OR REPLACE TEMP VIEW {TAGS_VIEW} AS SELECT * FROM {tag_table}")
             cursor.execute(f"CREATE OR REPLACE TEMP VIEW {ANKI_VERSIONS_VIEW} AS SELECT * FROM {anki_version_table}")
+            cursor.execute(f"CREATE OR REPLACE TEMP VIEW {REVIEWS_VIEW} AS "
+                           f"SELECT * EXCLUDE ({REVIEW_SEQ}) FROM {review_table}")
             timer.start()
             try:
                 cursor.execute(sql)

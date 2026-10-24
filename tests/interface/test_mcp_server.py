@@ -16,7 +16,7 @@ EXPECTED_TOOLS = {
     "search_addons", "filter_addons", "get_addon", "get_addon_readme", "get_addon_description",
     "check_compatibility", "assess_maintenance", "compare_forks", "find_similar_addons", "list_addons_by_author",
     "get_addon_history", "diff_snapshots", "get_statistics", "top_addons", "list_snapshots", "list_tags",
-    "list_anki_versions",
+    "list_anki_versions", "get_addon_reviews",
 }
 EXPECTED_PROMPTS = {
     "find_addon_for_task", "compare_addons", "addon_health_report", "upgrade_readiness",
@@ -56,7 +56,8 @@ async def test_lists_prompts_and_resources(client: Client) -> None:
     templates = {t.uri_template for t in (await client.list_resource_templates()).resource_templates}
     assert "anki-addons://addons/{addon_id}" in templates
     assert "anki-addons://tags/{tag}" in templates
-    assert len(templates) == 9
+    assert "anki-addons://addons/{addon_id}/reviews" in templates
+    assert len(templates) == 10
 
 
 async def test_search(client: Client) -> None:
@@ -112,6 +113,19 @@ async def test_anki_versions(client: Client) -> None:
     assert unknown.is_error
     resource = await client.read_resource("anki-addons://anki-versions")
     assert json.loads(resource.contents[0].text) == latest["result"]
+
+
+async def test_reviews(client: Client) -> None:
+    disliked = await call(client, "get_addon_reviews", addon_id=KANJI, vote="dislike", limit=1)
+    assert (disliked["total"], disliked["likes"], disliked["dislikes"]) == (2, 3, 2)
+    assert disliked["items"] == [{"date": "2026-09-25", "vote": "dislike", "text": "Crashes on Anki 25.09 when reviewing.",
+                                  "author_reply": "Fixed in the next VERSION."}]
+    old = await call(client, "get_addon_reviews", addon_id=KANJI, contains="slow", snapshot=OLD.isoformat())
+    assert old["total"] == 1
+    unknown = await client.call_tool("get_addon_reviews", {"addon_id": 424242})
+    assert unknown.is_error
+    resource = json.loads((await client.read_resource(f"anki-addons://addons/{KANJI}/reviews")).contents[0].text)  # type: ignore[union-attr]
+    assert (resource["total"], resource["limit"], len(resource["items"])) == (5, 50, 5)
 
 
 async def test_get_addon_include(client: Client) -> None:

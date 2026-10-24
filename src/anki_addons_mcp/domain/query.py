@@ -3,7 +3,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-from anki_addons_mcp.domain.models import VersionKind
+from anki_addons_mcp.domain.models import ReviewVote, VersionKind
 
 
 class SortField(StrEnum):
@@ -59,3 +59,14 @@ class AddonQuery(BaseModel):
 
     def has_text(self) -> bool:
         return bool(self.text and self.text.strip())
+
+
+class ReviewQuery(BaseModel):
+    vote: ReviewVote | None = None
+    contains: str | None = None
+    since: date | None = None
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=20, ge=1)
+
+    def contains_text(self) -> str | None:
+        return self.contains.strip().lower() if self.contains and self.contains.strip() else None

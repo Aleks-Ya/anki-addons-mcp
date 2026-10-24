@@ -11,19 +11,22 @@ from anki_addons_mcp.domain.models import (
     AddonCard,
     AddonDetails,
     AddonHistoryPoint,
+    AddonReview,
+    AddonReviews,
     Aggregation,
     AnkiRelease,
     AnkiWebInfo,
     GithubInfo,
     GroupField,
     Page,
+    ReviewVote,
     SnapshotInfo,
     Tag,
     TextKind,
     approval_score,
 )
 from anki_addons_mcp.domain.ports import AddonRepository
-from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, SortField
+from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, ReviewQuery, SortField
 
 _WORD = re.compile(r"\w+")
 
@@ -166,7 +169,8 @@ _GROUP_VALUES: dict[GroupField, Callable[[AddonDetails], list[str | None]]] = {
 class InMemoryAddonRepository(AddonRepository):
     def __init__(self, snapshots: dict[date, list[AddonDetails]], infos: dict[date, SnapshotInfo] | None = None,
                  documentation: str = "In-memory Anki addons dataset.", tags: dict[date, list[Tag]] | None = None,
-                 anki_versions: dict[date, list[AnkiRelease]] | None = None):
+                 anki_versions: dict[date, list[AnkiRelease]] | None = None,
+                 reviews: dict[date, dict[int, list[AddonReview]]] | None = None):
         if not snapshots:
             raise ValueError("At least one snapshot is required")
         self._snapshots = {d: {a.id: a for a in addons} for d, addons in snapshots.items()}
@@ -175,6 +179,7 @@ class InMemoryAddonRepository(AddonRepository):
         self._documentation = documentation
         self._tags = tags or {}
         self._anki_versions = anki_versions or {}
+        self._reviews = reviews or {}
 
     def _data(self, snapshot: date | None) -> dict[int, AddonDetails]:
         key = snapshot or self._latest
@@ -244,6 +249,24 @@ class InMemoryAddonRepository(AddonRepository):
                 anki_version=aw.anki_version, anki_version_kind=aw.anki_version_kind,
             ))
         return points
+
+    def list_reviews(self, addon_id: int, query: ReviewQuery, snapshot: date | None = None) -> AddonReviews:
+        key = snapshot or self._latest
+        self._data(key)
+        reviews = self._reviews.get(key, {}).get(addon_id, [])
+        contains = query.contains_text()
+        matching = [
+            r for r in reviews
+            if (query.vote is None or r.vote == query.vote) and (query.since is None or r.date >= query.since)
+            and (contains is None or contains in f"{r.text} {r.author_reply or ''}".lower())
+        ]
+        matching.sort(key=lambda r: r.date, reverse=True)
+        return AddonReviews(
+            addon_id=addon_id, total=len(matching),
+            likes=sum(1 for r in reviews if r.vote == ReviewVote.LIKE),
+            dislikes=sum(1 for r in reviews if r.vote == ReviewVote.DISLIKE),
+            offset=query.offset, limit=query.limit, items=matching[query.offset:query.offset + query.limit],
+        )
 
     def get_aggregation(self, snapshot: date | None = None) -> Aggregation:
         addons = list(self._data(snapshot).values())

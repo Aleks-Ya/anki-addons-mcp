@@ -88,6 +88,9 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("forum_topic_id", "forum.topic_id", "BIGINT"),
     ("forum_last_posted_at", "TRY_CAST(forum.last_posted_at AS VARCHAR)", "VARCHAR, timestamp"),
     ("forum_posts_count", "TRY_CAST(forum.posts_count AS BIGINT)", "BIGINT"),
+    ("forum_topic_source", "forum.topic_source",
+     ("VARCHAR, how the topic was found: 'override', 'contact_author', 'ai' (a description link an LLM confirmed "
+      "as the addon's own topic), 'most_linked' (an unverified description link)")),
     ("ai_summary", "ai.summary", "VARCHAR, LLM-generated summary (may be inaccurate)"),
     ("ai_model", "ai.model", "VARCHAR, model that wrote ai_summary"),
     ("ai_tags", "ai.tags", "VARCHAR[], LLM-picked tags (may be inaccurate), names from the `tags` table"),
@@ -108,6 +111,16 @@ ANKI_VERSION_COLUMNS: list[tuple[str, str]] = [
     ("version", "VARCHAR, the version as Anki writes it, e.g. 25.09.2 or 2.1.66"),
     ("point_version", "BIGINT, the same encoding as addons.anki_point_version and the branch point versions"),
 ]
+REVIEWS_VIEW = "reviews"
+REVIEW_COLUMNS: list[tuple[str, str]] = [
+    ("addon_id", "BIGINT, the reviewed addon (addons.id)"),
+    ("date", "DATE, when the review was written"),
+    ("vote", "VARCHAR, 'like' or 'dislike'"),
+    ("text", "VARCHAR, review text; '' for a review left without text"),
+    ("author_reply", "VARCHAR, the addon author's comment on the review, or NULL"),
+]
+# Row position in the parquet file, which lists each addon's reviews newest first: orders reviews of the same day.
+REVIEW_SEQ = "seq"
 _DENIED_FUNCTIONS = frozenset({"getenv", "current_setting"})
 
 
@@ -131,16 +144,28 @@ def anki_versions_select(parquet_path: str | None) -> str:
     return f"SELECT version, point_version FROM read_parquet('{escaped}')"
 
 
+def reviews_select(parquet_path: str) -> str:
+    escaped = parquet_path.replace("'", "''")
+    columns = ", ".join(f'"{name}"' for name, _ in REVIEW_COLUMNS)
+    return (f"SELECT {columns}, file_row_number AS {REVIEW_SEQ} "
+            f"FROM read_parquet('{escaped}', file_row_number = true)")
+
+
 def schema_description() -> str:
     lines = [f"- {name}: {desc}" for name, _, desc in FLAT_COLUMNS]
     tag_lines = [f"- {name}: {desc}" for name, desc in TAG_COLUMNS]
     version_lines = [f"- {name}: {desc}" for name, desc in ANKI_VERSION_COLUMNS]
+    review_lines = [f"- {name}: {desc}" for name, desc in REVIEW_COLUMNS]
     return (f"Table `{SQL_VIEW}` (one row per addon of the requested snapshot):\n" + "\n".join(lines)
             + f"\n\nTable `{TAGS_VIEW}` (the tag vocabulary of the snapshot, quote \"group\"):\n"
             + "\n".join(tag_lines)
             + f"\n\nTable `{ANKI_VERSIONS_VIEW}` (the stable Anki releases from 2.1.0 on known when the snapshot was "
             "collected; empty for snapshots collected before the dataset published it):\n"
-            + "\n".join(version_lines))
+            + "\n".join(version_lines)
+            + f"\n\nTable `{REVIEWS_VIEW}` (AnkiWeb user reviews, one row per review; join on "
+            f"{SQL_VIEW}.id = {REVIEWS_VIEW}.addon_id; reviewers are anonymous, and the vote counts can differ "
+            f"slightly from {SQL_VIEW}.likes/dislikes):\n"
+            + "\n".join(review_lines))
 
 
 def _walk(node: Any, ctes: set[str], tables: list[tuple[str, str, str]]) -> None:

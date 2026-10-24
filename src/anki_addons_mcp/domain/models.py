@@ -155,6 +155,10 @@ class ForumInfo(BaseModel):
     topic_id: int | None = None
     last_posted_at: str | None = None
     posts_count: int | None = None
+    topic_source: str | None = Field(
+        default=None, description="How the topic was found: 'override' (set by hand), 'contact_author' (the "
+                                  "AnkiWeb Contact Author link), 'ai' (a description link an LLM confirmed as the "
+                                  "addon's own topic) or 'most_linked' (an unverified description link)")
 
 
 class AiInfo(BaseModel):
@@ -258,6 +262,29 @@ class Tag(BaseModel):
 class AnkiRelease(BaseModel):
     version: str = Field(description="The version as Anki writes it, e.g. 25.09.2 or 2.1.66")
     point_version: int = Field(description="Anki's sortable integer encoding: 2.1.x -> x, YY.MM.PP -> YYMMPP")
+
+
+class ReviewVote(StrEnum):
+    LIKE = "like"
+    DISLIKE = "dislike"
+
+
+class AddonReview(BaseModel):
+    date: date
+    vote: ReviewVote
+    text: str = Field(description="Review text; empty for a review left without text")
+    author_reply: str | None = Field(default=None, description="The addon author's comment on the review")
+
+
+class AddonReviews(BaseModel):
+    addon_id: int
+    total: int = Field(description="Reviews matching the filters")
+    likes: int = Field(description="Like votes among all listed reviews of the addon, filters ignored; can differ "
+                                   "slightly from the page-wide anki_web.likes")
+    dislikes: int = Field(description="Dislike votes among all listed reviews of the addon, filters ignored")
+    offset: int
+    limit: int
+    items: list[AddonReview] = Field(description="Newest first; AnkiWeb does not show who wrote a review")
 
 
 class Page[T](BaseModel):

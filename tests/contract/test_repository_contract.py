@@ -5,15 +5,16 @@ import pytest
 from anki_addons_mcp.adapters.hf_parquet.repository import DuckDbAddonRepository
 from anki_addons_mcp.adapters.memory.repository import InMemoryAddonRepository
 from anki_addons_mcp.domain.errors import InvalidQuery, SnapshotNotFound
-from anki_addons_mcp.domain.models import NONE_GROUP, ForkEvidence, GroupField, TextKind, VersionKind
+from anki_addons_mcp.domain.models import NONE_GROUP, ForkEvidence, GroupField, ReviewVote, TextKind, VersionKind
 from anki_addons_mcp.domain.ports import AddonRepository
-from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, SortField
+from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, ReviewQuery, SortField
 from tests.fixtures.dataset import (
     ALICE_ADDONS,
     ANKI_VERSIONS,
     HEATMAP,
     KANJI,
     LATEST,
+    LATEST_REVIEWS,
     LEGACY,
     NEW_ADDON,
     NO_GITHUB,
@@ -64,6 +65,49 @@ def test_links_and_repo_source_in_details(repository: AddonRepository) -> None:
     assert other is not None
     assert other.github is not None
     assert other.github.repo_source == "self_reference"
+
+
+def test_forum_topic_source_in_details(repository: AddonRepository) -> None:
+    kanji, occlusion = repository.get_addons([KANJI, OCCLUSION])
+    assert kanji.forum is not None
+    assert kanji.forum.topic_source == "contact_author"
+    assert occlusion.forum is not None
+    assert occlusion.forum.topic_source == "ai"
+
+
+def test_list_reviews_newest_first_with_counts(repository: AddonRepository) -> None:
+    reviews = repository.list_reviews(KANJI, ReviewQuery())
+    assert reviews.items == LATEST_REVIEWS[KANJI]
+    assert (reviews.total, reviews.likes, reviews.dislikes) == (5, 3, 2)
+    assert reviews.items[2].text == ""
+
+
+def test_list_reviews_filters_keep_unfiltered_counts(repository: AddonRepository) -> None:
+    disliked = repository.list_reviews(KANJI, ReviewQuery(vote=ReviewVote.DISLIKE))
+    assert [r.text for r in disliked.items] == ["Crashes on Anki 25.09 when reviewing.", "Too slow."]
+    assert (disliked.total, disliked.likes, disliked.dislikes) == (2, 3, 2)
+    recent = repository.list_reviews(KANJI, ReviewQuery(since=date(2026, 3, 1)))
+    assert recent.total == 4
+
+
+@pytest.mark.parametrize("contains", ["25.09", "CRASHES", "next version", "  slow "])
+def test_list_reviews_contains_text_or_reply(repository: AddonRepository, contains: str) -> None:
+    found = repository.list_reviews(KANJI, ReviewQuery(contains=contains))
+    assert found.total == 1
+
+
+def test_list_reviews_paging(repository: AddonRepository) -> None:
+    page = repository.list_reviews(KANJI, ReviewQuery(limit=2, offset=1))
+    assert page.items == LATEST_REVIEWS[KANJI][1:3]
+    assert (page.total, page.offset, page.limit) == (5, 1, 2)
+
+
+def test_list_reviews_by_snapshot(repository: AddonRepository) -> None:
+    assert repository.list_reviews(KANJI, ReviewQuery(), OLD).total == 2
+    empty = repository.list_reviews(HEATMAP, ReviewQuery())
+    assert (empty.items, empty.total, empty.likes, empty.dislikes) == ([], 0, 0, 0)
+    with pytest.raises(SnapshotNotFound):
+        repository.list_reviews(KANJI, ReviewQuery(), date(2000, 1, 1))
 
 
 def test_get_addon_missing(repository: AddonRepository) -> None:

@@ -25,7 +25,8 @@ def register_prompts(mcp: MCPServer) -> None:
             "2. Pick up to 8 promising candidates; use get_addon (include=['description']) where the card is "
             "not enough to judge.\n"
             f"{compat}"
-            "4. Call assess_maintenance for the candidates.\n"
+            "4. Call assess_maintenance for the candidates and get_addon_reviews(addon_id, vote='dislike', "
+            "limit=5) for the finalists, to catch recent complaints.\n"
             "5. Recommend 3-5 addons. For each: what it does, why it fits, likes/dislikes, compatibility, "
             "maintenance label, and the AnkiWeb link. Mention trade-offs and warn about stale or "
             f"incompatible ones. {WARN_TAGS}\n\n" + AI_NOTE
@@ -36,7 +37,8 @@ def register_prompts(mcp: MCPServer) -> None:
         return (
             f"Compare these Anki addons: {addon_ids} (comma-separated AnkiWeb ids).\n\n"
             "For each, call get_addon (include=['description']) and assess_maintenance; call "
-            "get_addon_readme when the description is thin.\n"
+            "get_addon_readme when the description is thin, and get_addon_reviews (limit 10) for what users "
+            "praise and criticize.\n"
             "Produce a markdown table with columns: addon, main features, likes/dislikes, "
             "supported Anki versions, maintenance label, license, GitHub stars. Then summarize which one "
             "suits which kind of user.\n\n" + AI_NOTE
@@ -51,6 +53,8 @@ def register_prompts(mcp: MCPServer) -> None:
             "4. Find the newest Anki release known to the dataset with filter_addons(sort_by='anki_version', "
             "limit=1) (its anki_version), then call check_compatibility against it and report the addon's "
             f"anki_version_kind. {VERDICTS}\n"
+            "5. get_addon_reviews (limit 20, then vote='dislike') for what users report; quote concrete "
+            "complaints with their dates and note whether the author replied.\n"
             "Conclude with a verdict (safe to rely on / use with care / avoid) and the reasons.\n\n" + AI_NOTE
         )
 
@@ -62,7 +66,8 @@ def register_prompts(mcp: MCPServer) -> None:
             f"1. Call check_compatibility with all ids and anki_version={target_anki_version}.\n"
             "2. Group the result into: ready (supported), probably fine (likely), blocked (unsupported), "
             f"unknown. {VERDICTS} Mention when the manifest_verdict disagrees with the AnkiWeb verdict.\n"
-            "3. For blocked and unknown addons, call assess_maintenance, then find alternatives with "
+            "3. For blocked and unknown addons, call assess_maintenance and get_addon_reviews(addon_id, "
+            f"contains='{target_anki_version}') for user reports on that version, then find alternatives with "
             f"compare_forks(addon_id=<id>, anki_version={target_anki_version}) (other versions that may carry "
             "the addon on), find_similar_addons or "
             f"search_addons, using compatible_with_anki={target_anki_version}.\n"

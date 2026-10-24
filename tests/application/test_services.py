@@ -13,7 +13,7 @@ from anki_addons_mcp.application.snapshots import parse_snapshot
 from anki_addons_mcp.domain.compatibility import Support
 from anki_addons_mcp.domain.errors import AddonNotFound, InvalidQuery, SnapshotNotFound
 from anki_addons_mcp.domain.models import GroupField, TextKind, VersionKind, approval_score
-from anki_addons_mcp.domain.query import AddonFilters
+from anki_addons_mcp.domain.query import AddonFilters, ReviewQuery
 from tests.fixtures.dataset import (
     ALICE_ADDONS,
     HEATMAP,
@@ -85,6 +85,16 @@ def test_get_with_texts_and_without_links(services: Services) -> None:
 def test_get_missing(services: Services) -> None:
     with pytest.raises(AddonNotFound):
         services.catalog.get(424242)
+
+
+def test_reviews(services: Services) -> None:
+    assert services.catalog.reviews(KANJI, ReviewQuery(limit=1)).total == 5
+    with pytest.raises(AddonNotFound):
+        services.catalog.reviews(424242, ReviewQuery())
+    with pytest.raises(AddonNotFound):
+        services.catalog.reviews(NEW_ADDON, ReviewQuery(), OLD)
+    with pytest.raises(InvalidQuery):
+        services.catalog.reviews(KANJI, ReviewQuery(limit=101))
 
 
 def test_text_truncation(services: Services) -> None:

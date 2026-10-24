@@ -5,9 +5,9 @@ from pydantic import BaseModel
 
 from anki_addons_mcp.application.tags import TagService
 from anki_addons_mcp.domain.errors import AddonNotFound, InvalidQuery
-from anki_addons_mcp.domain.models import AddonCard, AddonDetails, Page, TextKind
+from anki_addons_mcp.domain.models import AddonCard, AddonDetails, AddonReviews, Page, TextKind
 from anki_addons_mcp.domain.ports import AddonRepository
-from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, SortField
+from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, ReviewQuery, SortField
 
 MAX_LIMIT = 100
 
@@ -130,6 +130,12 @@ class CatalogService:
         if missing:
             raise AddonNotFound(missing[0], snapshot)
         return [found[addon_id] for addon_id in addon_ids]
+
+    def reviews(self, addon_id: int, query: ReviewQuery, snapshot: date | None = None) -> AddonReviews:
+        check_limit(query.limit)
+        if self._repository.get_addon(addon_id, snapshot) is None:
+            raise AddonNotFound(addon_id, snapshot)
+        return self._repository.list_reviews(addon_id, query, snapshot)
 
     def text(
         self, addon_id: int, kind: TextKind, max_chars: int | None = None, snapshot: date | None = None

@@ -18,15 +18,17 @@ from anki_addons_mcp.application.tags import TagUsage
 from anki_addons_mcp.domain.models import (
     AddonCard,
     AddonDetails,
+    AddonReviews,
     AnkiRelease,
     GroupField,
     Page,
+    ReviewVote,
     SnapshotInfo,
     SqlResult,
     TextKind,
     VersionKind,
 )
-from anki_addons_mcp.domain.query import AddonFilters, SortField
+from anki_addons_mcp.domain.query import AddonFilters, ReviewQuery, SortField
 from anki_addons_mcp.interface.mcp.errors import tool_errors
 
 READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
@@ -121,7 +123,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Full record of one addon: AnkiWeb info and version branches, GitHub repository data and manifest, "
-        "Anki Forum topic, AI summary and tags, and fork relations (forked_from, forks). Long texts and link "
+        "Anki Forum topic (topic_source says how it was found), AI summary and tags, and fork relations (forked_from, forks). Long texts and link "
         "lists are omitted unless requested in 'include'."))
     def get_addon(addon_id: AddonId, include: list[AddonInclude] | None = None,
                   max_chars: MaxChars = 4000, snapshot: Snapshot = "latest") -> AddonDetails:
@@ -143,6 +145,23 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
                               snapshot: Snapshot = "latest") -> AddonText:
         with tool_errors():
             return catalog.text(addon_id, _DESCRIPTION_KINDS[format], max_chars, parse_snapshot(snapshot))
+
+    @mcp.tool(annotations=READ_ONLY, description=(
+        "AnkiWeb user reviews of an addon, newest first, with the like and dislike counts of all its listed "
+        "reviews. Use vote='dislike' or contains (e.g. 'crash', '25.09') to find reported problems, and since "
+        "for recent ones. Reviewers are anonymous; a review can carry the addon author's reply. The counts can "
+        "differ slightly from the page-wide likes/dislikes of the addon card."))
+    def get_addon_reviews(
+        addon_id: AddonId,
+        vote: Annotated[ReviewVote | None, Field(description="Only likes or only dislikes")] = None,
+        contains: Annotated[str | None, Field(
+            description="Case-insensitive text the review or the author's reply must contain")] = None,
+        since: Annotated[date | None, Field(description="Only reviews written on or after this date")] = None,
+        limit: Limit = 20, offset: Offset = 0, snapshot: Snapshot = "latest",
+    ) -> AddonReviews:
+        with tool_errors():
+            query = ReviewQuery(vote=vote, contains=contains, since=since, limit=limit, offset=offset)
+            return catalog.reviews(addon_id, query, parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Check whether addons support an Anki version, based on the parsed AnkiWeb branches (min and max "
@@ -271,7 +290,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
     @mcp.tool(annotations=READ_ONLY, description=(
         "Run one read-only DuckDB SELECT for questions the other tools cannot answer. "
         f"Results are capped at {limits.max_rows} rows and {limits.timeout_seconds:g}s.\n\n" + sql.sql_schema()))
-    def query_sql(sql_query: Annotated[str, Field(description="A single SELECT over the `addons` table")],
+    def query_sql(sql_query: Annotated[str, Field(description="A single SELECT over the tables below")],
                   snapshot: Snapshot = "latest") -> SqlResult:
         with tool_errors():
             return sql.execute_readonly(sql_query, parse_snapshot(snapshot), limits.max_rows, limits.timeout_seconds)

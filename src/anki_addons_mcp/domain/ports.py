@@ -6,6 +6,7 @@ from anki_addons_mcp.domain.models import (
     AddonCard,
     AddonDetails,
     AddonHistoryPoint,
+    AddonReviews,
     Aggregation,
     AnkiRelease,
     GroupField,
@@ -15,7 +16,7 @@ from anki_addons_mcp.domain.models import (
     Tag,
     TextKind,
 )
-from anki_addons_mcp.domain.query import AddonQuery
+from anki_addons_mcp.domain.query import AddonQuery, ReviewQuery
 
 
 class AddonRepository(ABC):
@@ -38,6 +39,11 @@ class AddonRepository(ABC):
     def get_history(
         self, addon_id: int, from_: date | None = None, to: date | None = None
     ) -> list[AddonHistoryPoint]: ...
+
+    @abstractmethod
+    def list_reviews(self, addon_id: int, query: ReviewQuery, snapshot: date | None = None) -> AddonReviews:
+        """AnkiWeb reviews of an addon, newest first; reviews of the same day keep the dataset's order."""
+        ...
 
     @abstractmethod
     def get_aggregation(self, snapshot: date | None = None) -> Aggregation: ...
