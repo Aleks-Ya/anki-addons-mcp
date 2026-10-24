@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from anki_addons_mcp.application.catalog import CatalogService
 from anki_addons_mcp.application.snapshots import SnapshotService
 from anki_addons_mcp.domain.errors import AddonNotFound
+from anki_addons_mcp.domain.models import AddonDetails
 
 
 class MaintenanceLabel(StrEnum):
@@ -66,6 +67,15 @@ class MaintenanceService:
     def assess(self, addon_id: int, snapshot: date | None = None) -> MaintenanceReport:
         as_of = self._snapshots.resolve(snapshot)
         details = self._catalog.get(addon_id, snapshot)
+        label, reasons, signals = self.classify(details, as_of)
+        if signals.forks and label in (MaintenanceLabel.STALE, MaintenanceLabel.ABANDONED):
+            reasons.append(self._forks_reason(signals.forks, snapshot))
+        return MaintenanceReport(addon_id=addon_id, title=details.anki_web.title, as_of=as_of, label=label,
+                                 reasons=reasons, signals=signals)
+
+    def classify(self, details: AddonDetails,
+                 as_of: date) -> tuple[MaintenanceLabel, list[str], MaintenanceSignals]:
+        """The label, its reasons and the signals of an already loaded addon, as of the snapshot date."""
         github = details.github
         forum = details.forum
         activity = [d for d in (
@@ -91,10 +101,7 @@ class MaintenanceService:
             forks=list(details.forks),
         )
         label, reasons = self._label(signals)
-        if signals.forks and label in (MaintenanceLabel.STALE, MaintenanceLabel.ABANDONED):
-            reasons.append(self._forks_reason(signals.forks, snapshot))
-        return MaintenanceReport(addon_id=addon_id, title=details.anki_web.title, as_of=as_of, label=label,
-                                 reasons=reasons, signals=signals)
+        return label, reasons, signals
 
     def _forks_reason(self, forks: list[int], snapshot: date | None) -> str:
         try:

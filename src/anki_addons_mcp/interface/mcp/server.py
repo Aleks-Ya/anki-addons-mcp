@@ -16,8 +16,10 @@ Anki Forum and AI-summary and AI-tag data, published as monthly snapshots.
 - Use get_addon for one full record and get_addon_readme/get_addon_description for long texts.
 - check_compatibility, assess_maintenance and find_similar_addons answer "will it work / is it maintained /
   what else is there".
-- forked_from/forks link an addon to its forks and the addon it was forked from; filter_addons(fork_of=id)
-  finds forks of an abandoned addon. Fork detection is incomplete and its 'ai' evidence may be inaccurate.
+- forked_from/forks link an addon to its forks and the addon it was forked from; compare_forks(addon_id)
+  compares all versions of an addon (the original, its forks and their forks), e.g. to find a maintained
+  fork of an abandoned addon, and filter_addons(fork_of=id) lists direct forks. Fork detection is
+  incomplete and its 'ai' evidence may be inaccurate.
 - Addons carry AI tags from a fixed vocabulary (list_tags): function tags (what an addon does) and status
   tags (obsolete, paid, beta, ...). Filter with tags/exclude_tags in search_addons and filter_addons.
 - list_anki_versions lists the real Anki releases of a snapshot, newest first: use it to check a version a user

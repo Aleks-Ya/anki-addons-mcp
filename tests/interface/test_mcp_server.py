@@ -8,13 +8,13 @@ from mcp import Client
 from anki_addons_mcp.application.services import build_services
 from anki_addons_mcp.domain.ports import AddonRepository
 from anki_addons_mcp.interface.mcp.server import build_server
-from tests.fixtures.dataset import HEATMAP, KANJI, NEW_ADDON, NO_GITHUB, OCCLUSION, OLD
+from tests.fixtures.dataset import HEATMAP, KANJI, NEW_ADDON, NO_GITHUB, OCCLUSION, OLD, SAME_AUTHOR
 
 pytestmark = pytest.mark.anyio
 
 EXPECTED_TOOLS = {
     "search_addons", "filter_addons", "get_addon", "get_addon_readme", "get_addon_description",
-    "check_compatibility", "assess_maintenance", "find_similar_addons", "list_addons_by_author",
+    "check_compatibility", "assess_maintenance", "compare_forks", "find_similar_addons", "list_addons_by_author",
     "get_addon_history", "diff_snapshots", "get_statistics", "top_addons", "list_snapshots", "list_tags",
     "list_anki_versions",
 }
@@ -197,14 +197,28 @@ async def test_filter_by_author_id(client: Client) -> None:
 
 async def test_fork_filters_and_details(client: Client) -> None:
     page = await call(client, "filter_addons", fork_of=KANJI)
-    assert [item["id"] for item in page["items"]] == [NEW_ADDON]
-    assert page["items"][0]["forked_from"] == KANJI
+    assert {item["id"] for item in page["items"]} == {NEW_ADDON, NO_GITHUB}
+    assert {item["forked_from"] for item in page["items"]} == {KANJI}
     details = await call(client, "get_addon", addon_id=NEW_ADDON)
     assert details["forked_from"] == {"id": KANJI, "evidence": "github_fork"}
     assert details["github"]["fork_source"] == "alice/kanji-helper"
     forks = await call(client, "search_addons", query="kanji", has_forks=True)
-    assert [item["id"] for item in forks["items"]] == [KANJI]
+    assert {item["id"] for item in forks["items"]} == {KANJI, NEW_ADDON}
 
+
+
+async def test_compare_forks(client: Client) -> None:
+    family = await call(client, "compare_forks", addon_id=SAME_AUTHOR, anki_version="25.02")
+    assert family["original_id"] == KANJI
+    assert [(m["id"], m["role"], m["depth"]) for m in family["members"]] == [
+        (KANJI, "original", 0), (NO_GITHUB, "fork", 1), (NEW_ADDON, "fork", 1), (SAME_AUTHOR, "fork", 2)]
+    assert [m["compatibility"] for m in family["members"]] == ["supported"] * 4
+    assert family["members"][2]["evidence"] == "github_fork"
+    assert family["members"][0]["approval"] > 0
+    assert "incomplete" in family["caveat"]
+    single = await call(client, "compare_forks", addon_id=OCCLUSION)
+    assert [m["id"] for m in single["members"]] == [OCCLUSION]
+    assert (await client.call_tool("compare_forks", {"addon_id": 999})).is_error
 
 async def test_description_as_html(client: Client) -> None:
     text = await call(client, "get_addon_description", addon_id=KANJI, format="html")

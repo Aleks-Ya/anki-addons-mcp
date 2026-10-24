@@ -157,6 +157,8 @@ def forum(topic_id: int, posts: int) -> dict[str, Any]:
 
 
 def latest_records() -> list[dict[str, Any]]:
+    # Fork families: KANJI -> NEW_ADDON -> SAME_AUTHOR (a fork of a fork) and KANJI -> NO_GITHUB (a sibling);
+    # LEGACY -> VIBE.
     return _link_forks([
         addon(KANJI, "Kanji Helper", rating=130, likes=125, dislikes=5, update_date="2026-09-20",
               anki_version="25.02~", branches=[("2.1.0", "2.1.49"), ("25.02", "+")],
@@ -189,7 +191,7 @@ def latest_records() -> list[dict[str, Any]]:
         addon(NO_GITHUB, "Simple Timer", rating=15, likes=15, update_date="2025-11-11", anki_version="",
               branches=[("2.1.50", "+")], description="A timer for review sessions. Zeitmesser.", lang="de",
               author_addons=ALICE_ADDONS,
-              ai_tags=["timer"]),
+              ai_tags=["timer"], forked_from=(KANJI, "ai")),
         addon(VIBE, "Vibe Deck Tools", rating=4, likes=3, dislikes=1, update_date="2026-09-29",
               anki_version="25.09~", branches=[("25.09", "+")], description="Deck tools vibe-coded with claude.",
               ai_declaration=["claude", "vibe-coded"], ai_tags=["deck-management", "beta"],
@@ -203,7 +205,7 @@ def latest_records() -> list[dict[str, Any]]:
                             fork_source="alice/kanji-helper")),
         addon(SAME_AUTHOR, "Alice Utilities", rating=42, likes=41, dislikes=1, update_date="2026-05-05",
               anki_version="23.10~", branches=[("23.10", "+")], description="Assorted utilities.",
-              author_addons=ALICE_ADDONS,
+              author_addons=ALICE_ADDONS, forked_from=(NEW_ADDON, "override"),
               github=github("Alice", "alice-utils", stars=20, topics=["utilities"])),
     ])
 

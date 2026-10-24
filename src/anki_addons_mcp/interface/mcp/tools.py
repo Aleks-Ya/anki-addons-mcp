@@ -7,6 +7,7 @@ from pydantic import Field
 
 from anki_addons_mcp.application.catalog import AddonText, TopMetric
 from anki_addons_mcp.application.compatibility import CompatibilityVerdict
+from anki_addons_mcp.application.forks import ForkFamily
 from anki_addons_mcp.application.history import AddonHistory, SnapshotDiff
 from anki_addons_mcp.application.maintenance import MaintenanceReport
 from anki_addons_mcp.application.services import Services
@@ -159,10 +160,26 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
     @mcp.tool(annotations=READ_ONLY, description=(
         "Maintenance health of an addon: last update/commit, archived flag, open issues, tests, CI and forum "
         "activity, plus a coarse label (active, stale, abandoned, unknown) with reasons. For a stale or abandoned "
-        "addon, the reasons name its forks; signals.forks holds their ids for assessing them in turn."))
+        "addon, the reasons name its forks; signals.forks holds their ids, and compare_forks compares the whole "
+        "fork family."))
     def assess_maintenance(addon_id: AddonId, snapshot: Snapshot = "latest") -> MaintenanceReport:
         with tool_errors():
             return services.maintenance.assess(addon_id, parse_snapshot(snapshot))
+
+    @mcp.tool(annotations=READ_ONLY, description=(
+        "All versions of an addon side by side: the original, its forks and forks of forks. Any member gives the "
+        "same family. Each version has its place (role, forked_from, evidence, depth), its compatibility "
+        "with anki_version (default: the latest Anki), maintenance label and last activity, AnkiWeb votes "
+        "and approval, GitHub stars, and the flags obsolete, beta, paid (AI tags) and github_archived. "
+        "Order: the original first, then each version followed by its forks; forks of the same addon by "
+        "approval. The tool picks no best version: forks can add features or do a different job. Fork "
+        "detection is incomplete and 'ai' evidence may be wrong. A family of one member means no fork "
+        "relations are known."))
+    def compare_forks(addon_id: AddonId, anki_version: AnkiVersion = None,
+                      limit: Annotated[int, Field(ge=1, le=100, description="Maximum number of family members")] = 50,
+                      snapshot: Snapshot = "latest") -> ForkFamily:
+        with tool_errors():
+            return services.forks.family(addon_id, anki_version, limit, parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Addons similar to a given one: overlapping wording in title, summary and topics, shared GitHub "

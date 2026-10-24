@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from anki_addons_mcp.application.catalog import CatalogService
 from anki_addons_mcp.application.compatibility import CompatibilityService
+from anki_addons_mcp.application.forks import ForkService
 from anki_addons_mcp.application.history import HistoryService
 from anki_addons_mcp.application.maintenance import MaintenanceService, MaintenanceThresholds
 from anki_addons_mcp.application.similarity import SimilarityService
@@ -24,6 +25,7 @@ class Services:
     catalog: CatalogService
     compatibility: CompatibilityService
     maintenance: MaintenanceService
+    forks: ForkService
     history: HistoryService
     similarity: SimilarityService
     stats: StatsService
@@ -38,12 +40,14 @@ def build_services(repository: AddonRepository, thresholds: MaintenanceThreshold
     tags = TagService(repository)
     catalog = CatalogService(repository, tags)
     sql = repository if sql_enabled and isinstance(repository, SqlQueryable) else None
+    maintenance = MaintenanceService(catalog, snapshots, thresholds or MaintenanceThresholds())
     return Services(
         repository=repository,
         snapshots=snapshots,
         catalog=catalog,
         compatibility=CompatibilityService(catalog),
-        maintenance=MaintenanceService(catalog, snapshots, thresholds or MaintenanceThresholds()),
+        maintenance=maintenance,
+        forks=ForkService(repository, snapshots, maintenance),
         history=HistoryService(repository, snapshots),
         similarity=SimilarityService(repository, catalog, tags),
         stats=StatsService(repository, snapshots),

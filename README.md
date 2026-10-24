@@ -68,7 +68,7 @@ To host your own instance, see [Run over HTTP](README-DEV.md#run-over-http) and
 
 **Tools** (all read-only, every data tool takes an optional `snapshot`, `YYYY-MM-DD` or `latest`):
 `search_addons`, `filter_addons`, `get_addon`, `get_addon_readme`, `get_addon_description`,
-`check_compatibility`, `assess_maintenance`, `find_similar_addons`, `list_addons_by_author`,
+`check_compatibility`, `assess_maintenance`, `compare_forks`, `find_similar_addons`, `list_addons_by_author`,
 `get_addon_history`, `diff_snapshots`, `get_statistics`, `top_addons`, `list_snapshots`, `list_tags`,
 `list_anki_versions`, and `query_sql` (one sandboxed DuckDB `SELECT` over the `addons`, `tags` and `anki_versions`
 tables; only offered by SQL-capable backends). `search_addons` accepts every filter of `filter_addons` (including AI tags with `tags` and
@@ -84,8 +84,10 @@ Fork relations come from the dataset: `get_addon` shows `forked_from`, the one a
 (with its evidence: `github_fork`, `ai` or `override`), `forks` (any number) and `github.fork_source`; cards carry
 the ids. `search_addons` and `filter_addons` filter by
 `is_fork`, `has_forks` and `fork_of` (the forks of one addon, e.g. a maintained fork of an abandoned addon);
-`find_similar_addons` and `assess_maintenance` point to them. Detection is incomplete and `ai` evidence may be
-wrong.
+`find_similar_addons` and `assess_maintenance` point to them. `compare_forks` returns the whole fork family of an
+addon (the original, its forks and forks of forks; the same family from any member) with each version's place
+in the family, compatibility with the latest or a given Anki version, maintenance label, votes, stars and status
+flags, without picking a winner. Detection is incomplete and `ai` evidence may be wrong.
 
 **Resources**: `anki-addons://dataset/readme`, `anki-addons://dataset/schema`,
 `anki-addons://dataset/anki-versions`, `anki-addons://snapshots`,

@@ -120,7 +120,7 @@ def test_forks_in_details(repository: AddonRepository) -> None:
     assert fork.github.fork_source == "alice/kanji-helper"
     parent = repository.get_addon(KANJI)
     assert parent is not None
-    assert (parent.forked_from, parent.forks) == (None, [NEW_ADDON])
+    assert (parent.forked_from, parent.forks) == (None, [NO_GITHUB, NEW_ADDON])
 
 
 def test_forks_on_cards(repository: AddonRepository) -> None:
@@ -132,7 +132,7 @@ def test_forks_on_cards(repository: AddonRepository) -> None:
 def test_forks_in_old_snapshot(repository: AddonRepository) -> None:
     kanji = repository.get_addon(KANJI, OLD)
     assert kanji is not None
-    assert kanji.forks == []
+    assert kanji.forks == [NO_GITHUB]
     assert ids(repository, AddonQuery(filters=AddonFilters(fork_of=LEGACY)), OLD) == [VIBE]
 
 
@@ -197,10 +197,10 @@ def test_find_text_no_match(repository: AddonRepository) -> None:
     (AddonFilters(description_language="DE"), {NO_GITHUB}),
     (AddonFilters(github_user="alice"), {KANJI, SAME_AUTHOR}),
     (AddonFilters(author_id=KANJI), set(ALICE_ADDONS)),
-    (AddonFilters(is_fork=True), {VIBE, NEW_ADDON}),
-    (AddonFilters(has_forks=True), {KANJI, LEGACY}),
-    (AddonFilters(is_fork=False, has_forks=False), {OCCLUSION, HEATMAP, NO_GITHUB, SAME_AUTHOR}),
-    (AddonFilters(fork_of=KANJI), {NEW_ADDON}),
+    (AddonFilters(is_fork=True), {VIBE, NEW_ADDON, NO_GITHUB, SAME_AUTHOR}),
+    (AddonFilters(has_forks=True), {KANJI, LEGACY, NEW_ADDON}),
+    (AddonFilters(is_fork=False, has_forks=False), {OCCLUSION, HEATMAP}),
+    (AddonFilters(fork_of=KANJI), {NEW_ADDON, NO_GITHUB}),
     (AddonFilters(fork_of=OCCLUSION), set()),
     (AddonFilters(updated_after=date(2026, 9, 1)), {KANJI, VIBE, NEW_ADDON}),
     (AddonFilters(updated_before=date(2020, 1, 1)), {LEGACY}),

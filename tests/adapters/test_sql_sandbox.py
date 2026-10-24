@@ -5,7 +5,7 @@ import pytest
 from anki_addons_mcp.adapters.hf_parquet.repository import DuckDbAddonRepository
 from anki_addons_mcp.domain.errors import InvalidQuery
 from anki_addons_mcp.domain.ports import SqlQueryable
-from tests.fixtures.dataset import KANJI, LEGACY, OLD
+from tests.fixtures.dataset import KANJI, LEGACY, NEW_ADDON, OLD
 
 
 def test_is_sql_queryable(duckdb_repository: DuckDbAddonRepository) -> None:
@@ -62,7 +62,7 @@ def test_dataset_2_4_columns(duckdb_repository: DuckDbAddonRepository, snapshot:
     assert result.rows == [expected]
 
 
-@pytest.mark.parametrize(("snapshot", "expected"), [(None, [2, 2, 1]), (OLD, [1, 1, 0])])
+@pytest.mark.parametrize(("snapshot", "expected"), [(None, [4, 3, 1]), (OLD, [3, 2, 0])])
 def test_dataset_2_5_columns(duckdb_repository: DuckDbAddonRepository, snapshot: date | None,
                              expected: list[int]) -> None:
     result = duckdb_repository.execute_readonly(
@@ -73,8 +73,9 @@ def test_dataset_2_5_columns(duckdb_repository: DuckDbAddonRepository, snapshot:
 
 def test_fork_evidence_column(duckdb_repository: DuckDbAddonRepository) -> None:
     result = duckdb_repository.execute_readonly(
-        "SELECT forked_from.id, forked_from.evidence FROM addons WHERE forked_from IS NOT NULL ORDER BY 1", None, 10, 5)
-    assert result.rows == [[KANJI, "github_fork"], [LEGACY, "ai"]]
+        "SELECT forked_from.id, forked_from.evidence FROM addons WHERE forked_from IS NOT NULL ORDER BY 1, 2", None, 10,
+        5)
+    assert result.rows == [[KANJI, "ai"], [KANJI, "github_fork"], [LEGACY, "ai"], [NEW_ADDON, "override"]]
 
 
 def test_row_cap(duckdb_repository: DuckDbAddonRepository) -> None:

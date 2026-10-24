@@ -63,7 +63,8 @@ def register_prompts(mcp: MCPServer) -> None:
             "2. Group the result into: ready (supported), probably fine (likely), blocked (unsupported), "
             f"unknown. {VERDICTS} Mention when the manifest_verdict disagrees with the AnkiWeb verdict.\n"
             "3. For blocked and unknown addons, call assess_maintenance, then find alternatives with "
-            "filter_addons(fork_of=<id>) (forks that may carry the addon on), find_similar_addons or "
+            f"compare_forks(addon_id=<id>, anki_version={target_anki_version}) (other versions that may carry "
+            "the addon on), find_similar_addons or "
             f"search_addons, using compatible_with_anki={target_anki_version}.\n"
             "4. Give a short upgrade recommendation.\n\n" + AI_NOTE
         )
@@ -91,7 +92,7 @@ def register_prompts(mcp: MCPServer) -> None:
             "and manifest, and assess_maintenance.\n"
             "3. Report: existing solutions and how well they are received, how they are implemented, "
             "which are abandoned (fork or replacement opportunity; check their forks with "
-            "filter_addons(fork_of=<id>) first), and gaps the idea could fill.\n\n" + AI_NOTE
+            "compare_forks first), and gaps the idea could fill.\n\n" + AI_NOTE
         )
 
     @mcp.prompt(description="Portfolio summary of a GitHub author's addons")

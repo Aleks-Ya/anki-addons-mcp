@@ -1,9 +1,11 @@
+from datetime import date
 from typing import Any
 
 import pytest
 
 from anki_addons_mcp.adapters.memory.repository import InMemoryAddonRepository
 from anki_addons_mcp.application.catalog import TopMetric
+from anki_addons_mcp.application.forks import ForkRole
 from anki_addons_mcp.application.maintenance import MaintenanceLabel
 from anki_addons_mcp.application.services import Services, build_services
 from anki_addons_mcp.application.similarity import SimilarAddon
@@ -25,6 +27,7 @@ from tests.fixtures.dataset import (
     REMOVED,
     SAME_AUTHOR,
     VIBE,
+    addon,
     domain_infos,
     domain_tags,
     latest_records,
@@ -223,7 +226,7 @@ def test_maintenance_points_abandoned_addon_to_its_forks(services: Services) -> 
 
 def test_maintenance_skips_forks_of_active_addon(services: Services) -> None:
     report = services.maintenance.assess(KANJI)
-    assert report.signals.forks == [NEW_ADDON]
+    assert report.signals.forks == [NO_GITHUB, NEW_ADDON]
     assert not any("forked" in reason for reason in report.reasons)
 
 
@@ -296,3 +299,96 @@ def test_similar_reports_shared_tags(services: Services) -> None:
     quiz = next(s for s in similar if s.card.id == NEW_ADDON)
     assert "shared tags: dictionary" in quiz.reasons
     assert not any("mobile-compatible" in reason for s in similar for reason in s.reasons)
+
+
+def test_fork_family_is_the_same_from_every_member(services: Services) -> None:
+    for member in (KANJI, NO_GITHUB, NEW_ADDON, SAME_AUTHOR):
+        family = services.forks.family(member)
+        assert family.addon_id == member
+        assert family.original_id == KANJI
+        assert [(m.id, m.depth) for m in family.members] == [(KANJI, 0), (NO_GITHUB, 1), (NEW_ADDON, 1),
+                                                             (SAME_AUTHOR, 2)]
+        assert not family.truncated
+        assert family.notes == []
+
+
+def test_fork_family_places_each_member(services: Services) -> None:
+    by_id = {m.id: m for m in services.forks.family(SAME_AUTHOR).members}
+    assert (by_id[KANJI].role, by_id[KANJI].forked_from, by_id[KANJI].evidence) == (ForkRole.ORIGINAL, None, None)
+    assert by_id[KANJI].forks == [NO_GITHUB, NEW_ADDON]
+    assert (by_id[NEW_ADDON].role, by_id[NEW_ADDON].forked_from, by_id[NEW_ADDON].evidence) == (
+        ForkRole.FORK, KANJI, "github_fork")
+    assert (by_id[NO_GITHUB].forked_from, by_id[NO_GITHUB].evidence) == (KANJI, "ai")
+    assert (by_id[SAME_AUTHOR].forked_from, by_id[SAME_AUTHOR].evidence) == (NEW_ADDON, "override")
+
+
+def test_fork_family_compares_compatibility_and_maintenance(services: Services) -> None:
+    family = services.forks.family(KANJI)
+    assert (family.as_of, family.anki_version, family.anki_point_version) == (LATEST, "26.09.3", 260903)
+    by_id = {m.id: m for m in family.members}
+    assert {m.compatibility for m in family.members} == {Support.SUPPORTED}
+    assert by_id[KANJI].manifest_compatibility == Support.SUPPORTED
+    assert by_id[NO_GITHUB].manifest_compatibility == Support.UNKNOWN
+    assert by_id[NO_GITHUB].maintenance == MaintenanceLabel.STALE
+    assert by_id[NEW_ADDON].maintenance == MaintenanceLabel.ACTIVE
+    assert by_id[KANJI].last_activity == date(2026, 9, 20)
+    assert (by_id[KANJI].likes, by_id[KANJI].dislikes, by_id[KANJI].github_stars) == (125, 5, 50)
+    assert by_id[KANJI].approval == round(approval_score(125, 5), 4)
+    older = {m.id: m.compatibility for m in services.forks.family(KANJI, anki_version="2.1.30").members}
+    assert older == {KANJI: Support.SUPPORTED, NO_GITHUB: Support.UNSUPPORTED, NEW_ADDON: Support.UNSUPPORTED,
+                     SAME_AUTHOR: Support.UNSUPPORTED}
+
+
+def test_fork_family_flags(services: Services) -> None:
+    family = services.forks.family(VIBE)
+    legacy, vibe = family.members
+    assert (legacy.id, legacy.obsolete, legacy.github_archived, legacy.maintenance) == (
+        LEGACY, True, True, MaintenanceLabel.ABANDONED)
+    assert (vibe.id, vibe.beta, vibe.obsolete, vibe.paid, vibe.evidence) == (VIBE, True, False, False, "ai")
+
+
+def test_fork_family_of_addon_without_forks(services: Services) -> None:
+    family = services.forks.family(OCCLUSION)
+    assert [(m.id, m.role, m.depth) for m in family.members] == [(OCCLUSION, ForkRole.ORIGINAL, 0)]
+    assert family.original_id == OCCLUSION
+
+
+def test_fork_family_limit(services: Services) -> None:
+    family = services.forks.family(KANJI, limit=2)
+    assert [m.id for m in family.members] == [KANJI, NO_GITHUB]
+    assert family.truncated
+    family = services.forks.family(SAME_AUTHOR, limit=2)
+    assert [(m.id, m.role, m.depth) for m in family.members] == [(NEW_ADDON, ForkRole.FORK, 0),
+                                                                 (SAME_AUTHOR, ForkRole.FORK, 1)]
+    assert (family.original_id, family.truncated) == (None, True)
+    with pytest.raises(InvalidQuery):
+        services.forks.family(KANJI, limit=101)
+
+
+def test_fork_family_with_parent_missing_from_snapshot(services: Services) -> None:
+    family = services.forks.family(SAME_AUTHOR, snapshot=OLD)
+    assert [(m.id, m.role, m.forked_from) for m in family.members] == [(SAME_AUTHOR, ForkRole.FORK, NEW_ADDON)]
+    assert family.original_id is None
+    assert f"{SAME_AUTHOR} was forked from {NEW_ADDON}, which is not in this snapshot." in family.notes
+    assert family.anki_version is None
+    assert family.members[0].compatibility is None
+    assert [m.id for m in services.forks.family(KANJI, snapshot=OLD).members] == [KANJI, NO_GITHUB]
+    assert services.forks.family(KANJI, "25.02", snapshot=OLD).members[0].compatibility == Support.SUPPORTED
+
+
+def test_fork_family_survives_a_loop_of_fork_links() -> None:
+    first, second, third = 2001, 2002, 2003
+    records = [addon(first, "First", forked_from=(second, "ai")), addon(second, "Second", forked_from=(first, "ai")),
+               addon(third, "Third", forked_from=(first, "override"))]
+    records[0]["forks"], records[1]["forks"] = [second, third], [first]
+    services = build_services(InMemoryAddonRepository({LATEST: [to_details(r) for r in records]}))
+    for member in (first, second, third):
+        family = services.forks.family(member)
+        assert [(m.id, m.depth) for m in family.members] == [(first, 0), (second, 1), (third, 1)]
+        assert family.original_id is None
+        assert f"The fork links form a loop; the list starts at its smallest id, {first}." in family.notes
+
+
+def test_fork_family_of_unknown_addon(services: Services) -> None:
+    with pytest.raises(AddonNotFound):
+        services.forks.family(999)
