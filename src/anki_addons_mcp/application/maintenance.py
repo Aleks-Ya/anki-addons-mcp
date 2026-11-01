@@ -1,12 +1,13 @@
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 from anki_addons_mcp.application.catalog import CatalogService
 from anki_addons_mcp.application.snapshots import SnapshotService
 from anki_addons_mcp.domain.errors import AddonNotFound
-from anki_addons_mcp.domain.models import AddonDetails
+from anki_addons_mcp.domain.models import AddonDetails, GithubInfo
 
 
 class MaintenanceLabel(StrEnum):
@@ -23,10 +24,10 @@ class MaintenanceThresholds(BaseModel):
 
 class MaintenanceSignals(BaseModel):
     ankiweb_update_date: str | None
-    github_last_commit: str | None
-    github_pushed_at: str | None
-    github_archived: bool | None
-    github_open_issues: int | None = Field(description="Open issues and open pull requests together")
+    github_last_commit: str | None = None
+    github_pushed_at: str | None = None
+    github_archived: bool | None = None
+    github_open_issues: int | None = Field(default=None, description="Open issues and open pull requests together")
     github_open_issue_count: int | None = None
     github_closed_issue_count: int | None = None
     github_open_pr_count: int | None = None
@@ -41,8 +42,8 @@ class MaintenanceSignals(BaseModel):
     github_commits_last_year: int | None = None
     github_contributor_count: int | None = None
     github_latest_release_at: str | None = None
-    github_tests_count: int | None
-    github_action_count: int | None
+    github_tests_count: int | None = None
+    github_action_count: int | None = None
     forum_last_posted_at: str | None
     forum_posts_count: int | None
     last_activity: date | None
@@ -70,6 +71,40 @@ def _to_date(value: str | None) -> date | None:
             return date.fromisoformat(value.strip()[:10])
         except ValueError:
             return None
+
+
+def _last_activity(details: AddonDetails) -> date | None:
+    github = details.github
+    dates = [details.anki_web.update_date, github.last_commit, github.pushed_at] if github \
+        else [details.anki_web.update_date]
+    activity = [d for d in map(_to_date, dates) if d is not None]
+    return max(activity) if activity else None
+
+
+def _github_signals(github: GithubInfo | None) -> dict[str, Any]:
+    if github is None:
+        return {}
+    return {
+        "github_last_commit": github.last_commit,
+        "github_pushed_at": github.pushed_at,
+        "github_archived": github.archived,
+        "github_open_issues": github.open_issues,
+        "github_open_issue_count": github.open_issue_count,
+        "github_closed_issue_count": github.closed_issue_count,
+        "github_open_pr_count": github.open_pr_count,
+        "github_merged_pr_count": github.merged_pr_count,
+        "github_has_issues_enabled": github.has_issues_enabled,
+        "github_last_issue_closed_at": github.last_issue_closed_at,
+        "github_median_first_response_hours": github.median_first_response_hours,
+        "github_first_response_sample": github.first_response_sample,
+        "github_outside_pr_merge_share": github.outside_pr_merge_share,
+        "github_outside_prs_decided": github.outside_prs_decided,
+        "github_commits_last_year": github.commits_last_year,
+        "github_contributor_count": github.contributor_count,
+        "github_latest_release_at": github.latest_release_at,
+        "github_tests_count": github.tests_count,
+        "github_action_count": github.action_count,
+    }
 
 
 def _responsiveness_reasons(signals: MaintenanceSignals) -> list[str]:
@@ -113,36 +148,12 @@ class MaintenanceService:
     def classify(self, details: AddonDetails,
                  as_of: date) -> tuple[MaintenanceLabel, list[str], MaintenanceSignals]:
         """The label, its reasons and the signals of an already loaded addon, as of the snapshot date."""
-        github = details.github
         forum = details.forum
-        activity = [d for d in (
-            _to_date(details.anki_web.update_date),
-            _to_date(github.last_commit) if github else None,
-            _to_date(github.pushed_at) if github else None,
-        ) if d is not None]
-        last_activity = max(activity) if activity else None
+        last_activity = _last_activity(details)
         days = (as_of - last_activity).days if last_activity else None
         signals = MaintenanceSignals(
+            **_github_signals(details.github),
             ankiweb_update_date=details.anki_web.update_date,
-            github_last_commit=github.last_commit if github else None,
-            github_pushed_at=github.pushed_at if github else None,
-            github_archived=github.archived if github else None,
-            github_open_issues=github.open_issues if github else None,
-            github_open_issue_count=github.open_issue_count if github else None,
-            github_closed_issue_count=github.closed_issue_count if github else None,
-            github_open_pr_count=github.open_pr_count if github else None,
-            github_merged_pr_count=github.merged_pr_count if github else None,
-            github_has_issues_enabled=github.has_issues_enabled if github else None,
-            github_last_issue_closed_at=github.last_issue_closed_at if github else None,
-            github_median_first_response_hours=github.median_first_response_hours if github else None,
-            github_first_response_sample=github.first_response_sample if github else None,
-            github_outside_pr_merge_share=github.outside_pr_merge_share if github else None,
-            github_outside_prs_decided=github.outside_prs_decided if github else None,
-            github_commits_last_year=github.commits_last_year if github else None,
-            github_contributor_count=github.contributor_count if github else None,
-            github_latest_release_at=github.latest_release_at if github else None,
-            github_tests_count=github.tests_count if github else None,
-            github_action_count=github.action_count if github else None,
             forum_last_posted_at=forum.last_posted_at if forum else None,
             forum_posts_count=forum.posts_count if forum else None,
             last_activity=last_activity,

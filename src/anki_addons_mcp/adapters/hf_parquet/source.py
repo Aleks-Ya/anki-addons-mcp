@@ -82,6 +82,9 @@ class _BaseSource:
     def _history_names(self) -> list[str]:
         raise NotImplementedError
 
+    def package_url(self, addon_id: int, file_name: str) -> str | None:
+        raise NotImplementedError
+
     def latest_date(self) -> date:
         with self._lock:
             if self._latest is None:
