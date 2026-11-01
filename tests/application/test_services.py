@@ -182,27 +182,54 @@ def test_maintenance_reports_activity_signals_and_reasons(services: Services) ->
     assert (signals.github_commits_last_year, signals.github_contributor_count) == (3, 2)
     assert signals.github_latest_release_at == "2026-09-20T10:00:00"
     assert signals.github_last_issue_closed_at == "2026-09-10T08:00:00"
-    for reason in ("The repository had 3 commits in the last year.",
-                   "The repository has 1 open and 6 closed issues.",
-                   "The repository has 1 open and 4 merged pull requests.",
-                   ("The median first response took 12.5 hours over 8 answered issues and pull requests; unanswered "
-                    "ones are not counted."),
-                   "75% of the 4 decided pull requests from outside authors were merged."):
+    for reason in ("Commits in the last year: 3.",
+                   "Issues: 1 open, 6 closed.",
+                   "Pull requests: 1 open, 4 merged.",
+                   "Median first response: 12 hours (8 answered issues and pull requests).",
+                   "Outside pull requests: 75% of 4 merged."):
         assert reason in report.reasons
+
+
+@pytest.mark.parametrize(("hours", "text"), [
+    (0.4, "less than 1 hour"),
+    (1.2, "1 hour"),
+    (256.26, "256 hours"),
+])
+def test_maintenance_shows_response_time_in_whole_hours(services: Services, hours: float, text: str) -> None:
+    details = services.catalog.get(KANJI)
+    assert details.github is not None
+    changed = details.model_copy(update={"github": details.github.model_copy(update={
+        "median_first_response_hours": hours,
+    })})
+    _, reasons, _ = services.maintenance.classify(changed, LATEST)
+    assert f"Median first response: {text} (8 answered issues and pull requests)." in reasons
+
+
+def test_maintenance_reports_last_activity_tests_and_workflows(services: Services) -> None:
+    details = services.catalog.get(KANJI)
+    assert details.github is not None
+    changed = details.model_copy(update={"github": details.github.model_copy(update={
+        "tests_count": 3, "action_count": 2,
+    })})
+    _, reasons, signals = services.maintenance.classify(changed, LATEST)
+    assert (f"Last update or commit: {signals.last_activity} "
+            f"({signals.days_since_last_activity} days before the snapshot).") in reasons
+    assert "Test files: 3." in reasons
+    assert "GitHub Actions workflows: 2." in reasons
 
 
 def test_maintenance_says_when_issues_are_off(services: Services) -> None:
     report = services.maintenance.assess(VIBE)
-    assert "The repository has issues turned off." in report.reasons
-    assert not any("closed issues" in reason for reason in report.reasons)
+    assert "Issues are turned off." in report.reasons
+    assert not any("closed" in reason for reason in report.reasons)
 
 
 @pytest.mark.parametrize("snapshot", [None, OLD])
 def test_maintenance_without_activity_data_gives_no_activity_reasons(services: Services, snapshot: date | None) -> None:
     report = services.maintenance.assess(HEATMAP, snapshot)
     assert report.signals.github_commits_last_year is None
-    assert not any(word in reason for reason in report.reasons
-                   for word in ("commits in the last year", "closed issues", "pull requests", "turned off"))
+    assert not any(word in reason.lower() for reason in report.reasons
+                   for word in ("commits in the last year", "issues:", "pull requests", "turned off"))
 
 
 def test_maintenance_label_ignores_activity_data(services: Services) -> None:
@@ -284,14 +311,13 @@ def test_similar_lists_fork_parent(services: Services) -> None:
 def test_maintenance_points_abandoned_addon_to_its_forks(services: Services) -> None:
     report = services.maintenance.assess(LEGACY)
     assert report.signals.forks == [VIBE]
-    assert (f'Another addon was forked from this one and may still be maintained: "Vibe Deck Tools" ({VIBE}).'
-            in report.reasons)
+    assert f'Forks that may still be maintained: "Vibe Deck Tools" ({VIBE}).' in report.reasons
 
 
 def test_maintenance_skips_forks_of_active_addon(services: Services) -> None:
     report = services.maintenance.assess(KANJI)
     assert report.signals.forks == [NO_GITHUB, NEW_ADDON]
-    assert not any("forked" in reason for reason in report.reasons)
+    assert not any("Forks" in reason for reason in report.reasons)
 
 
 def test_similar_falls_back_to_github_user_without_authors(services: Services) -> None:

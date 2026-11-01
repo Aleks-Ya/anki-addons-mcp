@@ -107,26 +107,32 @@ def _github_signals(github: GithubInfo | None) -> dict[str, Any]:
     }
 
 
+def _hours(hours: float) -> str:
+    rounded = round(hours)
+    if rounded == 0:
+        return "less than 1 hour"
+    return "1 hour" if rounded == 1 else f"{rounded} hours"
+
+
 def _responsiveness_reasons(signals: MaintenanceSignals) -> list[str]:
     """Context for the label, which rests on dates alone: a stable addon can go long without a commit."""
     reasons = []
     if signals.github_commits_last_year is not None:
-        reasons.append(f"The repository had {signals.github_commits_last_year} commits in the last year.")
+        reasons.append(f"Commits in the last year: {signals.github_commits_last_year}.")
     if signals.github_has_issues_enabled is False:
-        reasons.append("The repository has issues turned off.")
+        reasons.append("Issues are turned off.")
     elif signals.github_open_issue_count is not None and signals.github_closed_issue_count is not None:
-        reasons.append(f"The repository has {signals.github_open_issue_count} open and "
-                       f"{signals.github_closed_issue_count} closed issues.")
+        reasons.append(f"Issues: {signals.github_open_issue_count} open, "
+                       f"{signals.github_closed_issue_count} closed.")
     if signals.github_open_pr_count is not None and signals.github_merged_pr_count is not None:
-        reasons.append(f"The repository has {signals.github_open_pr_count} open and "
-                       f"{signals.github_merged_pr_count} merged pull requests.")
+        reasons.append(f"Pull requests: {signals.github_open_pr_count} open, "
+                       f"{signals.github_merged_pr_count} merged.")
     if signals.github_median_first_response_hours is not None:
-        reasons.append(f"The median first response took {signals.github_median_first_response_hours:g} hours over "
-                       f"{signals.github_first_response_sample} answered issues and pull requests; unanswered ones "
-                       "are not counted.")
+        reasons.append(f"Median first response: {_hours(signals.github_median_first_response_hours)} "
+                       f"({signals.github_first_response_sample} answered issues and pull requests).")
     if signals.github_outside_pr_merge_share is not None:
-        reasons.append(f"{signals.github_outside_pr_merge_share:.0%} of the {signals.github_outside_prs_decided} "
-                       "decided pull requests from outside authors were merged.")
+        reasons.append(f"Outside pull requests: {signals.github_outside_pr_merge_share:.0%} of "
+                       f"{signals.github_outside_prs_decided} merged.")
     return reasons
 
 
@@ -169,8 +175,7 @@ class MaintenanceService:
             names = [f'"{fork.anki_web.title}" ({fork.id})' for fork in self._catalog.get_many(forks, snapshot)]
         except AddonNotFound:
             names = [str(fork) for fork in forks]
-        lead = "Another addon was" if len(forks) == 1 else f"{len(forks)} other addons were"
-        return f"{lead} forked from this one and may still be maintained: {', '.join(names)}."
+        return f"Forks that may still be maintained: {', '.join(names)}."
 
     def _label(self, signals: MaintenanceSignals) -> tuple[MaintenanceLabel, list[str]]:
         reasons = []
@@ -179,11 +184,11 @@ class MaintenanceService:
         if signals.days_since_last_activity is None:
             return MaintenanceLabel.UNKNOWN, ["No update or commit dates are available."]
         days = signals.days_since_last_activity
-        reasons.append(f"Last update or commit was {days} days before the snapshot ({signals.last_activity}).")
+        reasons.append(f"Last update or commit: {signals.last_activity} ({days} days before the snapshot).")
         if signals.github_tests_count:
-            reasons.append(f"The repository has {signals.github_tests_count} test files.")
+            reasons.append(f"Test files: {signals.github_tests_count}.")
         if signals.github_action_count:
-            reasons.append(f"The repository has {signals.github_action_count} GitHub Actions workflows.")
+            reasons.append(f"GitHub Actions workflows: {signals.github_action_count}.")
         reasons.extend(_responsiveness_reasons(signals))
         if days <= self._thresholds.active_days:
             return MaintenanceLabel.ACTIVE, reasons
