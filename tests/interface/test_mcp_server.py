@@ -16,7 +16,7 @@ EXPECTED_TOOLS = {
     "search_addons", "filter_addons", "get_addon", "get_addon_readme", "get_addon_description",
     "check_compatibility", "assess_maintenance", "compare_forks", "find_similar_addons", "list_addons_by_author",
     "get_addon_history", "diff_snapshots", "get_statistics", "top_addons", "list_snapshots", "list_tags",
-    "list_anki_versions", "get_addon_reviews",
+    "list_anki_versions", "get_addon_reviews", "get_addon_packages",
 }
 EXPECTED_PROMPTS = {
     "find_addon_for_task", "compare_addons", "addon_health_report", "upgrade_readiness",
@@ -57,7 +57,8 @@ async def test_lists_prompts_and_resources(client: Client) -> None:
     assert "anki-addons://addons/{addon_id}" in templates
     assert "anki-addons://tags/{tag}" in templates
     assert "anki-addons://addons/{addon_id}/reviews" in templates
-    assert len(templates) == 10
+    assert "anki-addons://addons/{addon_id}/packages" in templates
+    assert len(templates) == 11
 
 
 async def test_search(client: Client) -> None:
@@ -106,8 +107,9 @@ async def test_tags(client: Client) -> None:
 
 async def test_anki_versions(client: Client) -> None:
     latest = await call(client, "list_anki_versions")
-    assert latest["result"][:2] == [{"version": "26.09.3", "point_version": 260903},
-                                    {"version": "26.09", "point_version": 260900}]
+    assert latest["result"][:2] == [{"version": "26.09.3", "point_version": 260903, "release_date": "2026-09-23"},
+                                    {"version": "26.09", "point_version": 260900, "release_date": "2026-09-01"}]
+    assert latest["result"][-1] == {"version": "2.1.0", "point_version": 0, "release_date": None}
     assert (await call(client, "list_anki_versions", snapshot=OLD.isoformat()))["result"] == []
     unknown = await client.call_tool("list_anki_versions", {"snapshot": "2000-01-01"})
     assert unknown.is_error
@@ -126,6 +128,33 @@ async def test_reviews(client: Client) -> None:
     assert unknown.is_error
     resource = json.loads((await client.read_resource(f"anki-addons://addons/{KANJI}/reviews")).contents[0].text)  # type: ignore[union-attr]
     assert (resource["total"], resource["limit"], len(resource["items"])) == (5, 50, 5)
+
+
+async def test_packages(client: Client) -> None:
+    plain = (await call(client, "get_addon_packages", addon_id=KANJI))["result"]
+    assert [p["min_point_version"] for p in plain] == [0, 250200]
+    assert plain[1]["python_lines"] == 450
+    assert (plain[1]["manifest_json"], plain[1]["config_json"], plain[1]["files"]) == (None, None, [])
+    full = (await call(client, "get_addon_packages", addon_id=KANJI, include=["manifest", "config", "files"],
+                       max_files=2))["result"]
+    assert full[1]["manifest_json"] == '{"name": "Kanji Helper"}'
+    assert full[1]["config_json"] == '{"font": "sans"}'
+    assert (full[1]["files"], full[1]["file_count"]) == (["__init__.py", "manifest.json"], 3)
+    assert (await call(client, "get_addon_packages", addon_id=KANJI, snapshot=OLD.isoformat()))["result"] == []
+    assert (await client.call_tool("get_addon_packages", {"addon_id": 424242})).is_error
+    resource = json.loads((await client.read_resource(f"anki-addons://addons/{KANJI}/packages")).contents[0].text)  # type: ignore[union-attr]
+    assert resource == plain
+
+
+async def test_get_addon_omits_releases_unless_included(client: Client) -> None:
+    plain = await call(client, "get_addon", addon_id=KANJI)
+    assert plain["github"]["releases"] is None
+    assert plain["github"]["release_count"] == 2
+    assert plain["github"]["commits_last_year"] == 3
+    full = await call(client, "get_addon", addon_id=KANJI, include=["releases"])
+    assert [r["tag_name"] for r in full["github"]["releases"]] == ["v3.0b1", "v2.0"]
+    resource = json.loads((await client.read_resource(f"anki-addons://addons/{KANJI}")).contents[0].text)  # type: ignore[union-attr]
+    assert resource["github"]["releases"] is None
 
 
 async def test_get_addon_include(client: Client) -> None:

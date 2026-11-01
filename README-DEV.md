@@ -97,7 +97,7 @@ The Space sleeps after inactivity, so the first request can be slow while it wak
 **Logs** tab of the [Space page](https://huggingface.co/spaces/Ya-Alex/anki-addons-mcp), not in the Inspector.
 
 **Tips**
-- **Timeouts:** the first start downloads the latest snapshot (~15 MB). The first `get_addon_history` or
+- **Timeouts:** the first start downloads the latest snapshot (~20 MB). The first `get_addon_history` or
   `diff_snapshots` call that needs older snapshots can take a minute or more. If a call times out, raise
   **Request Timeout** in the Inspector's **Configuration** panel (e.g. `300000` ms). Later runs read the
   files from the HF cache.

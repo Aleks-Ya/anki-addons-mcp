@@ -7,7 +7,7 @@ from pydantic import BaseModel, TypeAdapter
 from anki_addons_mcp.application.services import Services
 from anki_addons_mcp.application.snapshots import parse_snapshot
 from anki_addons_mcp.application.tags import TagUsage
-from anki_addons_mcp.domain.models import AddonDetails, AnkiRelease, SnapshotInfo, TextKind
+from anki_addons_mcp.domain.models import AddonDetails, AddonPackage, AnkiRelease, SnapshotInfo, TextKind
 from anki_addons_mcp.domain.query import ReviewQuery
 from anki_addons_mcp.interface.mcp.errors import parse_addon_id, resource_errors
 
@@ -15,6 +15,7 @@ JSON = "application/json"
 _SNAPSHOTS = TypeAdapter(list[SnapshotInfo])
 _TAGS = TypeAdapter(list[TagUsage])
 _ANKI_RELEASES = TypeAdapter(list[AnkiRelease])
+_PACKAGES = TypeAdapter(list[AddonPackage])
 
 ANKI_VERSIONS_GUIDE = """# Anki versions in the dataset
 
@@ -49,9 +50,10 @@ Anki encodes a version as one sortable integer (as strings, `2.1.66` > `23.10` w
 
 ## Anki releases
 list_anki_versions (and anki-addons://anki-versions for the latest snapshot) lists the stable Anki releases from
-2.1.0 on as known when the snapshot was collected, newest first: `version` as Anki writes it and its
-`point_version`. Betas and release candidates are left out. query_sql has the same rows as the `anki_versions`
-table. Snapshots collected before the dataset published the list have none.
+2.1.0 on as known when the snapshot was collected, newest first: `version` as Anki writes it, its
+`point_version` and `release_date`. The date is null for a version without a GitHub release (most before 2.1.22)
+and in snapshots before 2026-11-01. Betas and release candidates are left out. query_sql has the same rows as the
+`anki_versions` table. Snapshots collected before the dataset published the list have none.
 
 ## Compatibility verdicts (check_compatibility, compatible_with_anki)
 - supported: a branch covers the version (between min and max, or open-ended).
@@ -106,7 +108,7 @@ def register_resources(mcp: MCPServer, services: Services) -> None:
                   description="Full record of an addon in the latest snapshot")
     def addon(addon_id: str) -> str:
         with resource_errors():
-            return _json(catalog.get(parse_addon_id(addon_id), include_links=False))
+            return _json(catalog.get(parse_addon_id(addon_id), include_links=False, include_releases=False))
 
     @mcp.resource("anki-addons://addons/{addon_id}/readme", mime_type="text/markdown",
                   description="GitHub README of an addon")
@@ -140,6 +142,14 @@ def register_resources(mcp: MCPServer, services: Services) -> None:
     def addon_reviews(addon_id: str) -> str:
         with resource_errors():
             return _json(catalog.reviews(parse_addon_id(addon_id), ReviewQuery(limit=50)))
+
+    @mcp.resource("anki-addons://addons/{addon_id}/packages", mime_type=JSON,
+                  description="Sizes, counts and download URLs of an addon's .ankiaddon packages in the latest snapshot")
+    def addon_packages(addon_id: str) -> str:
+        with resource_errors():
+            packages = catalog.packages(parse_addon_id(addon_id), include_manifest=False, include_config=False,
+                                        include_files=False)
+            return _PACKAGES.dump_json(packages, indent=2).decode()
 
     @mcp.resource("anki-addons://addons/{addon_id}/history", mime_type=JSON,
                   description="Rating, likes and stars of an addon across snapshots")

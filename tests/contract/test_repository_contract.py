@@ -14,6 +14,7 @@ from tests.fixtures.dataset import (
     HEATMAP,
     KANJI,
     LATEST,
+    LATEST_PACKAGES,
     LATEST_REVIEWS,
     LEGACY,
     NEW_ADDON,
@@ -109,6 +110,75 @@ def test_list_reviews_by_snapshot(repository: AddonRepository) -> None:
     query, unknown = ReviewQuery(), date(2000, 1, 1)
     with pytest.raises(SnapshotNotFound):
         repository.list_reviews(KANJI, query, unknown)
+
+
+def test_github_activity_in_details(repository: AddonRepository) -> None:
+    details = repository.get_addon(KANJI)
+    assert details is not None
+    github = details.github
+    assert github is not None
+    assert github.releases is not None
+    assert [r.tag_name for r in github.releases] == ["v3.0b1", "v2.0"]
+    assert (github.releases[0].name, github.releases[0].prerelease, github.releases[0].assets) == (None, True, [])
+    assert github.releases[1].assets[0].download_count == 75
+    assert (github.release_count, github.latest_release_tag, github.release_downloads) == (2, "v2.0", 75)
+    assert github.contributors is not None
+    assert [(c.login, c.contributions) for c in github.contributors] == [("alice", 40), ("bob", 2)]
+    assert github.weekly_commits == [0] * 51 + [3]
+    assert (github.commits_last_year, github.contributor_count) == (3, 2)
+    assert (github.open_issues, github.open_issue_count, github.open_pr_count) == (2, 1, 1)
+    assert (github.closed_issue_count, github.closed_pr_count, github.merged_pr_count) == (6, 1, 4)
+    assert (github.has_issues_enabled, github.last_issue_closed_at) == (True, "2026-09-10T08:00:00")
+    assert (github.median_first_response_hours, github.first_response_sample) == (12.5, 8)
+    assert (github.outside_pr_merge_share, github.outside_prs_decided, github.outside_prs_merged) == (0.75, 4, 3)
+
+
+def test_github_activity_keeps_null_apart_from_empty(repository: AddonRepository) -> None:
+    unknown, no_releases = repository.get_addons([HEATMAP, VIBE])
+    assert unknown.github is not None
+    assert (unknown.github.releases, unknown.github.contributors, unknown.github.weekly_commits) == (None, None, None)
+    assert (unknown.github.open_issue_count, unknown.github.has_issues_enabled) == (None, None)
+    assert no_releases.github is not None
+    assert no_releases.github.releases == []
+    assert no_releases.github.has_issues_enabled is False
+
+
+def test_new_fields_in_old_snapshot_with_drifted_schema(repository: AddonRepository) -> None:
+    details = repository.get_addon(KANJI, OLD)
+    assert details is not None
+    assert details.package is None
+    assert details.anki_web.package_size_kb == 10
+    assert details.github is not None
+    assert (details.github.releases, details.github.contributors, details.github.weekly_commits) == (None, None, None)
+    assert (details.github.commits_last_year, details.github.median_first_response_hours) == (None, None)
+    assert details.github.open_issues == 2
+
+
+def test_package_summary_is_the_newest_branch(repository: AddonRepository) -> None:
+    kanji, no_package = repository.get_addons([KANJI, HEATMAP])
+    assert kanji.package is not None
+    newest = LATEST_PACKAGES[KANJI][-1]
+    assert (kanji.package.file_name, kanji.package.size_bytes) == (newest.file_name, newest.size_bytes)
+    assert kanji.package.updated == "2026-09-20"
+    assert no_package.package is None
+    assert no_package.anki_web.package_size_kb == 10
+    without_size = repository.get_addon(NO_GITHUB)
+    assert without_size is not None
+    assert without_size.anki_web.package_size_kb is None
+
+
+def test_list_packages(repository: AddonRepository) -> None:
+    assert repository.list_packages(KANJI) == LATEST_PACKAGES[KANJI]
+    assert repository.list_packages(HEATMAP) == []
+    assert repository.list_packages(KANJI, OLD) == []
+    unknown = date(2000, 1, 1)
+    with pytest.raises(SnapshotNotFound):
+        repository.list_packages(KANJI, unknown)
+
+
+def test_anki_release_dates(repository: AddonRepository) -> None:
+    assert repository.list_anki_versions() == ANKI_VERSIONS
+    assert repository.list_anki_versions()[-1].release_date is None
 
 
 def test_get_addon_missing(repository: AddonRepository) -> None:

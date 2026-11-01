@@ -11,6 +11,7 @@ from anki_addons_mcp.domain.models import (
     AddonCard,
     AddonDetails,
     AddonHistoryPoint,
+    AddonPackage,
     AddonReview,
     AddonReviews,
     Aggregation,
@@ -170,7 +171,8 @@ class InMemoryAddonRepository(AddonRepository):
     def __init__(self, snapshots: dict[date, list[AddonDetails]], infos: dict[date, SnapshotInfo] | None = None,
                  documentation: str = "In-memory Anki addons dataset.", tags: dict[date, list[Tag]] | None = None,
                  anki_versions: dict[date, list[AnkiRelease]] | None = None,
-                 reviews: dict[date, dict[int, list[AddonReview]]] | None = None):
+                 reviews: dict[date, dict[int, list[AddonReview]]] | None = None,
+                 packages: dict[date, dict[int, list[AddonPackage]]] | None = None):
         if not snapshots:
             raise ValueError("At least one snapshot is required")
         self._snapshots = {d: {a.id: a for a in addons} for d, addons in snapshots.items()}
@@ -180,6 +182,7 @@ class InMemoryAddonRepository(AddonRepository):
         self._tags = tags or {}
         self._anki_versions = anki_versions or {}
         self._reviews = reviews or {}
+        self._packages = packages or {}
 
     def _data(self, snapshot: date | None) -> dict[int, AddonDetails]:
         key = snapshot or self._latest
@@ -267,6 +270,11 @@ class InMemoryAddonRepository(AddonRepository):
             dislikes=sum(1 for r in reviews if r.vote == ReviewVote.DISLIKE),
             offset=query.offset, limit=query.limit, items=matching[query.offset:query.offset + query.limit],
         )
+
+    def list_packages(self, addon_id: int, snapshot: date | None = None) -> list[AddonPackage]:
+        key = snapshot or self._latest
+        self._data(key)
+        return sorted(self._packages.get(key, {}).get(addon_id, []), key=lambda p: p.min_point_version or 0)
 
     def get_aggregation(self, snapshot: date | None = None) -> Aggregation:
         addons = list(self._data(snapshot).values())

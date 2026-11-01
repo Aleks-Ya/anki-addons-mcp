@@ -1,6 +1,8 @@
 import json
 from typing import Any
 
+from pydantic import BaseModel
+
 from anki_addons_mcp.domain.models import (
     AddonCard,
     AddonDetails,
@@ -11,10 +13,13 @@ from anki_addons_mcp.domain.models import (
     Branch,
     ForkRelation,
     ForumInfo,
+    GithubContributor,
     GithubInfo,
     GithubLink,
+    GithubRelease,
     LanguageBytes,
     Manifest,
+    PackageSummary,
     VersionKind,
 )
 
@@ -33,6 +38,11 @@ def _list(value: Any) -> list[Any]:
 
 def _structs(value: Any) -> list[dict[str, Any]]:
     return [v for v in _list(value) if isinstance(v, dict)]
+
+
+def _validated[T: BaseModel](model: type[T], value: Any) -> list[T] | None:
+    """None stays None: the dataset uses it for 'not known', unlike an empty list."""
+    return None if value is None else [model.model_validate(v) for v in _structs(value)]
 
 
 def _manifest(value: Any) -> Manifest | None:
@@ -84,6 +94,7 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
         description_language_confidence=row["description_language_confidence"],
         description_pre_wrap=bool(row["description_pre_wrap"]),
         other_items_count=row["other_items_count"],
+        package_size_kb=row["package_size_kb"],
     )
     github = None
     if row["has_github"]:
@@ -113,6 +124,27 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
             dependencies=_list(row["github_dependencies"]),
             ai_tooling_markers=_list(row["github_ai_tooling_markers"]),
             fork_source=row["github_fork_source"],
+            releases=_validated(GithubRelease, row["github_releases"]),
+            release_count=row["github_release_count"],
+            latest_release_tag=row["github_latest_release_tag"],
+            latest_release_at=row["github_latest_release_at"],
+            release_downloads=row["github_release_downloads"],
+            contributors=_validated(GithubContributor, row["github_contributors"]),
+            contributor_count=row["github_contributor_count"],
+            weekly_commits=row["github_weekly_commits"],
+            commits_last_year=row["github_commits_last_year"],
+            open_issue_count=row["github_open_issue_count"],
+            closed_issue_count=row["github_closed_issue_count"],
+            open_pr_count=row["github_open_pr_count"],
+            closed_pr_count=row["github_closed_pr_count"],
+            merged_pr_count=row["github_merged_pr_count"],
+            has_issues_enabled=row["github_has_issues_enabled"],
+            last_issue_closed_at=row["github_last_issue_closed_at"],
+            median_first_response_hours=row["github_median_first_response_hours"],
+            first_response_sample=row["github_first_response_sample"],
+            outside_pr_merge_share=row["github_outside_pr_merge_share"],
+            outside_prs_decided=row["github_outside_prs_decided"],
+            outside_prs_merged=row["github_outside_prs_merged"],
         )
     forum = None
     if row["has_forum"] or row["forum_topic_id"] is not None:
@@ -128,5 +160,6 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
     has_ai = row["ai_summary"] or row["ai_model"] or tags
     ai = AiInfo(summary=row["ai_summary"], model=row["ai_model"], tags=tags) if has_ai else None
     forked_from = ForkRelation.model_validate(row["forked_from"]) if row["forked_from"] else None
+    package = PackageSummary.model_validate(row["package"]) if row["package"] else None
     return AddonDetails(id=row["id"], anki_web=anki_web, github=github, forum=forum, ai=ai, author=_author(row),
-                        forked_from=forked_from, forks=_list(row["forks"]))
+                        forked_from=forked_from, forks=_list(row["forks"]), package=package)

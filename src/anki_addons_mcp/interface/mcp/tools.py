@@ -18,6 +18,7 @@ from anki_addons_mcp.application.tags import TagUsage
 from anki_addons_mcp.domain.models import (
     AddonCard,
     AddonDetails,
+    AddonPackage,
     AddonReviews,
     AnkiRelease,
     GroupField,
@@ -39,7 +40,8 @@ Limit = Annotated[int, Field(ge=1, le=100, description="Maximum number of result
 Offset = Annotated[int, Field(ge=0, description="Number of results to skip, for paging")]
 AnkiVersion = Annotated[str | None, Field(description="Anki version such as 25.02, 25.09.2, 2.1.66 or 26.05b1")]
 MaxChars = Annotated[int, Field(ge=100, le=200_000, description="Truncate the text to this many characters")]
-AddonInclude = Literal["description", "readme", "links"]
+AddonInclude = Literal["description", "readme", "links", "releases"]
+PackageInclude = Literal["manifest", "config", "files"]
 Tags = Annotated[list[str] | None, Field(
     description="AI tags the addon must all have, e.g. ['statistics'] or ['cloze', 'mobile-compatible']; "
                 "see list_tags for the vocabulary")]
@@ -122,15 +124,17 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
             return catalog.filter(filters, sort_by, descending, limit, offset, parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description=(
-        "Full record of one addon: AnkiWeb info and version branches, GitHub repository data and manifest, "
-        "Anki Forum topic (topic_source says how it was found), AI summary and tags, and fork relations (forked_from, forks). Long texts and link "
-        "lists are omitted unless requested in 'include'."))
+        "Full record of one addon: AnkiWeb info and version branches, GitHub repository data, activity (commits, "
+        "contributors, issues, pull requests, releases) and manifest, Anki Forum topic (topic_source says how it was "
+        "found), the newest package's sizes, AI summary and tags, and fork relations (forked_from, forks). Long texts, "
+        "link lists and the GitHub release list are omitted unless requested in 'include'; github.release_count tells "
+        "whether there are releases."))
     def get_addon(addon_id: AddonId, include: list[AddonInclude] | None = None,
                   max_chars: MaxChars = 4000, snapshot: Snapshot = "latest") -> AddonDetails:
         parts = set(include or [])
         with tool_errors():
             return catalog.get(addon_id, parse_snapshot(snapshot), "description" in parts, "readme" in parts,
-                               max_chars, "links" in parts)
+                               max_chars, "links" in parts, "releases" in parts)
 
     @mcp.tool(annotations=READ_ONLY, description="GitHub README of an addon as markdown text.")
     def get_addon_readme(addon_id: AddonId, max_chars: MaxChars = 20000, snapshot: Snapshot = "latest") -> AddonText:
@@ -164,6 +168,23 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
             return catalog.reviews(addon_id, query, parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description=(
+        "The .ankiaddon packages AnkiWeb serves for an addon, one per branch, by minimum Anki version: file name, "
+        "date, size, file and Python line counts (bundled libraries included) and download URL. 'include' adds the "
+        "raw manifest.json and config.json and the list of files. Use it to see what an addon really ships. Empty "
+        "for snapshots before 2026-11-01, when packages were not collected. The files stay under their authors' "
+        "licenses, not the dataset's CC0."))
+    def get_addon_packages(
+        addon_id: AddonId, include: list[PackageInclude] | None = None,
+        max_files: Annotated[int, Field(ge=1, le=20000, description=(
+            "Maximum number of paths per package when 'files' is included; file_count gives the full number"))] = 200,
+        snapshot: Snapshot = "latest",
+    ) -> list[AddonPackage]:
+        parts = set(include or [])
+        with tool_errors():
+            return catalog.packages(addon_id, parse_snapshot(snapshot), "manifest" in parts, "config" in parts,
+                                    "files" in parts, max_files)
+
+    @mcp.tool(annotations=READ_ONLY, description=(
         "Check whether addons support an Anki version, based on the parsed AnkiWeb branches (min and max "
         "point versions and the max version kind), with a separate verdict from the GitHub manifest. "
         "Verdicts: supported (a branch covers the version), likely (tested on an older version, newer Anki "
@@ -177,8 +198,10 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
             return services.compatibility.check(addon_ids, anki_version, parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description=(
-        "Maintenance health of an addon: last update/commit, archived flag, open issues, tests, CI and forum "
-        "activity, plus a coarse label (active, stale, abandoned, unknown) with reasons. For a stale or abandoned "
+        "Maintenance health of an addon: last update/commit, archived flag, commits in the last year, issues and pull "
+        "requests, how fast and how often maintainers respond, tests, CI and forum activity, plus a coarse label "
+        "(active, stale, abandoned, unknown) with reasons. The label rests on dates and the archived flag only: a "
+        "stable addon can go long without a commit and still answer its users, so read the signals too. For a stale or abandoned "
         "addon, the reasons name its forks; signals.forks holds their ids, and compare_forks compares the whole "
         "fork family."))
     def assess_maintenance(addon_id: AddonId, snapshot: Snapshot = "latest") -> MaintenanceReport:
@@ -271,8 +294,9 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Stable Anki releases from 2.1.0 on as known when the snapshot was collected, newest first (the first is "
-        "the latest Anki), each with its point version. Use it to check a version a user mentions or to find the "
-        "latest Anki. Empty for snapshots collected before the dataset published the list."))
+        "the latest Anki), each with its point version and release date (null for most versions before 2.1.22 and "
+        "in snapshots before 2026-11-01). Use it to check a version a user mentions or to find the latest Anki. "
+        "Empty for snapshots collected before the dataset published the list."))
     def list_anki_versions(snapshot: Snapshot = "latest") -> list[AnkiRelease]:
         with tool_errors():
             return services.repository.list_anki_versions(parse_snapshot(snapshot))

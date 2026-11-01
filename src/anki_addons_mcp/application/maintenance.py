@@ -26,7 +26,21 @@ class MaintenanceSignals(BaseModel):
     github_last_commit: str | None
     github_pushed_at: str | None
     github_archived: bool | None
-    github_open_issues: int | None
+    github_open_issues: int | None = Field(description="Open issues and open pull requests together")
+    github_open_issue_count: int | None = None
+    github_closed_issue_count: int | None = None
+    github_open_pr_count: int | None = None
+    github_merged_pr_count: int | None = None
+    github_has_issues_enabled: bool | None = None
+    github_last_issue_closed_at: str | None = None
+    github_median_first_response_hours: float | None = Field(
+        default=None, description="Items nobody answered are left out, so a low median can hide ignored issues")
+    github_first_response_sample: int | None = None
+    github_outside_pr_merge_share: float | None = None
+    github_outside_prs_decided: int | None = None
+    github_commits_last_year: int | None = None
+    github_contributor_count: int | None = None
+    github_latest_release_at: str | None = None
     github_tests_count: int | None
     github_action_count: int | None
     forum_last_posted_at: str | None
@@ -56,6 +70,29 @@ def _to_date(value: str | None) -> date | None:
             return date.fromisoformat(value.strip()[:10])
         except ValueError:
             return None
+
+
+def _responsiveness_reasons(signals: MaintenanceSignals) -> list[str]:
+    """Context for the label, which rests on dates alone: a stable addon can go long without a commit."""
+    reasons = []
+    if signals.github_commits_last_year is not None:
+        reasons.append(f"The repository had {signals.github_commits_last_year} commits in the last year.")
+    if signals.github_has_issues_enabled is False:
+        reasons.append("The repository has issues turned off.")
+    elif signals.github_open_issue_count is not None and signals.github_closed_issue_count is not None:
+        reasons.append(f"The repository has {signals.github_open_issue_count} open and "
+                       f"{signals.github_closed_issue_count} closed issues.")
+    if signals.github_open_pr_count is not None and signals.github_merged_pr_count is not None:
+        reasons.append(f"The repository has {signals.github_open_pr_count} open and "
+                       f"{signals.github_merged_pr_count} merged pull requests.")
+    if signals.github_median_first_response_hours is not None:
+        reasons.append(f"The median first response took {signals.github_median_first_response_hours:g} hours over "
+                       f"{signals.github_first_response_sample} answered issues and pull requests; unanswered ones "
+                       "are not counted.")
+    if signals.github_outside_pr_merge_share is not None:
+        reasons.append(f"{signals.github_outside_pr_merge_share:.0%} of the {signals.github_outside_prs_decided} "
+                       "decided pull requests from outside authors were merged.")
+    return reasons
 
 
 class MaintenanceService:
@@ -91,6 +128,19 @@ class MaintenanceService:
             github_pushed_at=github.pushed_at if github else None,
             github_archived=github.archived if github else None,
             github_open_issues=github.open_issues if github else None,
+            github_open_issue_count=github.open_issue_count if github else None,
+            github_closed_issue_count=github.closed_issue_count if github else None,
+            github_open_pr_count=github.open_pr_count if github else None,
+            github_merged_pr_count=github.merged_pr_count if github else None,
+            github_has_issues_enabled=github.has_issues_enabled if github else None,
+            github_last_issue_closed_at=github.last_issue_closed_at if github else None,
+            github_median_first_response_hours=github.median_first_response_hours if github else None,
+            github_first_response_sample=github.first_response_sample if github else None,
+            github_outside_pr_merge_share=github.outside_pr_merge_share if github else None,
+            github_outside_prs_decided=github.outside_prs_decided if github else None,
+            github_commits_last_year=github.commits_last_year if github else None,
+            github_contributor_count=github.contributor_count if github else None,
+            github_latest_release_at=github.latest_release_at if github else None,
             github_tests_count=github.tests_count if github else None,
             github_action_count=github.action_count if github else None,
             forum_last_posted_at=forum.last_posted_at if forum else None,
@@ -123,6 +173,7 @@ class MaintenanceService:
             reasons.append(f"The repository has {signals.github_tests_count} test files.")
         if signals.github_action_count:
             reasons.append(f"The repository has {signals.github_action_count} GitHub Actions workflows.")
+        reasons.extend(_responsiveness_reasons(signals))
         if days <= self._thresholds.active_days:
             return MaintenanceLabel.ACTIVE, reasons
         if days <= self._thresholds.stale_days:

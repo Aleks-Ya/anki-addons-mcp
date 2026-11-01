@@ -14,6 +14,7 @@ Anki Forum and AI-summary and AI-tag data, published as monthly snapshots.
 - Start with search_addons (free text) or filter_addons (structured); both return compact addon cards.
   search_addons accepts every filter of filter_addons, so a query can be narrowed the same way.
 - Use get_addon for one full record and get_addon_readme/get_addon_description for long texts.
+  get_addon_packages shows what an addon really ships: sizes, code volume, raw manifest and config, file list.
 - check_compatibility, assess_maintenance and find_similar_addons answer "will it work / is it maintained /
   what else is there". get_addon_reviews shows what users report, e.g. breakage on a new Anki
   (vote='dislike', contains='25.09').

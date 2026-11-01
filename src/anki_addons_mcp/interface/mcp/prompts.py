@@ -48,7 +48,8 @@ def register_prompts(mcp: MCPServer) -> None:
     def addon_health_report(addon_id: str) -> str:
         return (
             f"Write a health report for Anki addon {addon_id}.\n\n"
-            "1. get_addon for the basics.\n2. assess_maintenance for activity signals.\n"
+            "1. get_addon for the basics.\n2. assess_maintenance for activity signals; besides the label, report "
+            "commits in the last year and how the maintainers respond to issues and pull requests.\n"
             "3. get_addon_history to show the trend of rating, likes and stars.\n"
             "4. Find the newest Anki release known to the dataset with filter_addons(sort_by='anki_version', "
             "limit=1) (its anki_version), then call check_compatibility against it and report the addon's "

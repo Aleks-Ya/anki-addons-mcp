@@ -6,6 +6,7 @@ from anki_addons_mcp.domain.models import (
     AddonCard,
     AddonDetails,
     AddonHistoryPoint,
+    AddonPackage,
     AddonReviews,
     Aggregation,
     AnkiRelease,
@@ -43,6 +44,11 @@ class AddonRepository(ABC):
     @abstractmethod
     def list_reviews(self, addon_id: int, query: ReviewQuery, snapshot: date | None = None) -> AddonReviews:
         """AnkiWeb reviews of an addon, newest first; reviews of the same day keep the dataset's order."""
+        ...
+
+    @abstractmethod
+    def list_packages(self, addon_id: int, snapshot: date | None = None) -> list[AddonPackage]:
+        """The addon's .ankiaddon packages, one per branch, by minimum Anki version; none before 2026-11-01."""
         ...
 
     @abstractmethod

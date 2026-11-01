@@ -175,6 +175,58 @@ def test_maintenance(services: Services, addon_id: int, label: MaintenanceLabel)
     assert report.reasons
 
 
+def test_maintenance_reports_activity_signals_and_reasons(services: Services) -> None:
+    report = services.maintenance.assess(KANJI)
+    signals = report.signals
+    assert (signals.github_open_issues, signals.github_open_issue_count, signals.github_open_pr_count) == (2, 1, 1)
+    assert (signals.github_commits_last_year, signals.github_contributor_count) == (3, 2)
+    assert signals.github_latest_release_at == "2026-09-20T10:00:00"
+    assert signals.github_last_issue_closed_at == "2026-09-10T08:00:00"
+    for reason in ("The repository had 3 commits in the last year.",
+                   "The repository has 1 open and 6 closed issues.",
+                   "The repository has 1 open and 4 merged pull requests.",
+                   ("The median first response took 12.5 hours over 8 answered issues and pull requests; unanswered "
+                    "ones are not counted."),
+                   "75% of the 4 decided pull requests from outside authors were merged."):
+        assert reason in report.reasons
+
+
+def test_maintenance_says_when_issues_are_off(services: Services) -> None:
+    report = services.maintenance.assess(VIBE)
+    assert "The repository has issues turned off." in report.reasons
+    assert not any("closed issues" in reason for reason in report.reasons)
+
+
+@pytest.mark.parametrize("snapshot", [None, OLD])
+def test_maintenance_without_activity_data_gives_no_activity_reasons(services: Services, snapshot: date | None) -> None:
+    report = services.maintenance.assess(HEATMAP, snapshot)
+    assert report.signals.github_commits_last_year is None
+    assert not any(word in reason for reason in report.reasons
+                   for word in ("commits in the last year", "closed issues", "pull requests", "turned off"))
+
+
+def test_maintenance_label_ignores_activity_data(services: Services) -> None:
+    details = services.catalog.get(HEATMAP)
+    assert details.github is not None
+    busy = details.model_copy(update={"github": details.github.model_copy(update={
+        "commits_last_year": 500, "median_first_response_hours": 1.0, "first_response_sample": 50,
+        "last_issue_closed_at": "2026-09-30T00:00:00", "latest_release_at": "2026-09-30T00:00:00",
+    })})
+    label, _, _ = services.maintenance.classify(busy, LATEST)
+    assert label == MaintenanceLabel.ABANDONED
+
+
+def test_packages_trims_what_was_not_requested(services: Services) -> None:
+    plain = services.catalog.packages(KANJI, include_manifest=False, include_config=False, include_files=False)
+    assert [(p.manifest_json, p.config_json, p.files) for p in plain] == [(None, None, [])] * 2
+    assert plain[1].file_count == 3
+    cut = services.catalog.packages(KANJI, max_files=1)
+    assert cut[1].files == ["__init__.py"]
+    assert cut[1].manifest_json == '{"name": "Kanji Helper"}'
+    with pytest.raises(AddonNotFound):
+        services.catalog.packages(424242)
+
+
 def test_maintenance_uses_snapshot_date(services: Services) -> None:
     report = services.maintenance.assess(KANJI, OLD)
     assert report.as_of == OLD

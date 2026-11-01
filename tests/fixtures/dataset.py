@@ -7,7 +7,15 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from anki_addons_mcp.domain.compatibility import point_to_str, to_point
-from anki_addons_mcp.domain.models import AddonDetails, AddonReview, AnkiRelease, ReviewVote, SnapshotInfo, Tag
+from anki_addons_mcp.domain.models import (
+    AddonDetails,
+    AddonPackage,
+    AddonReview,
+    AnkiRelease,
+    ReviewVote,
+    SnapshotInfo,
+    Tag,
+)
 
 OLD = date(2026, 9, 1)
 LATEST = date(2026, 10, 1)
@@ -43,8 +51,9 @@ TAGS = [
 ]
 
 # Newest first, as published. The OLD snapshot has no anki_versions file (collected before the table existed).
-ANKI_VERSIONS = [AnkiRelease(version=v, point_version=p) for v, p in [
-    ("26.09.3", 260903), ("26.09", 260900), ("25.02.7", 250207), ("23.10", 231000), ("2.1.66", 66), ("2.1.0", 0),
+ANKI_VERSIONS = [AnkiRelease(version=v, point_version=p, release_date=d) for v, p, d in [
+    ("26.09.3", 260903, date(2026, 9, 23)), ("26.09", 260900, date(2026, 9, 1)), ("25.02.7", 250207, date(2025, 6, 1)),
+    ("23.10", 231000, date(2023, 10, 31)), ("2.1.66", 66, date(2023, 8, 1)), ("2.1.0", 0, None),
 ]]
 
 # Per addon newest first, as published; the three reviews of 2026-09-25 pin the order of same-day reviews.
@@ -61,6 +70,45 @@ LATEST_REVIEWS: dict[int, list[AddonReview]] = {
 }
 _REVIEW_SCHEMA = pa.schema([("addon_id", pa.int64()), ("date", pa.date32()), ("vote", pa.large_string()),
                             ("text", pa.large_string()), ("author_reply", pa.large_string())])
+
+# Sorted by addon and minimum Anki version, as published. Only the LATEST snapshot holds packages.
+LATEST_PACKAGES: dict[int, list[AddonPackage]] = {
+    KANJI: [
+        AddonPackage(file_name="0-2021-03-01-aaaaaaaaaaaa.ankiaddon", min_point_version=0, updated=date(2021, 3, 1),
+                     size_bytes=5000, config_json='{"font": "serif"}', file_count=2, uncompressed_bytes=12000,
+                     python_file_count=1, python_lines=120, files=["__init__.py", "config.json"]),
+        AddonPackage(file_name="250200-2026-09-20-bbbbbbbbbbbb.ankiaddon", min_point_version=250200,
+                     updated=date(2026, 9, 20), size_bytes=9000, manifest_json='{"name": "Kanji Helper"}',
+                     config_json='{"font": "sans"}', file_count=3, uncompressed_bytes=30000, python_file_count=2,
+                     python_lines=450, files=["__init__.py", "manifest.json", "lib/strokes.py"]),
+    ],
+    OCCLUSION: [
+        AddonPackage(file_name="66-2026-08-01-cccccccccccc.ankiaddon", min_point_version=66, updated=date(2026, 8, 1),
+                     size_bytes=70000, file_count=1, uncompressed_bytes=90000, python_file_count=1, python_lines=900,
+                     files=["__init__.py"]),
+    ],
+}
+_PACKAGE_SCHEMA = pa.schema([
+    ("addon_id", pa.int64()), ("file_name", pa.string()), ("min_point_version", pa.int64()),
+    ("updated", pa.date32()), ("size_bytes", pa.int64()), ("manifest_json", pa.string()), ("config_json", pa.string()),
+    ("file_count", pa.int64()), ("uncompressed_bytes", pa.int64()), ("python_file_count", pa.int64()),
+    ("python_lines", pa.int64()), ("files", pa.list_(pa.string())),
+])
+
+
+def packages_at(snapshot: date) -> dict[int, list[AddonPackage]]:
+    return LATEST_PACKAGES if snapshot == LATEST else {}
+
+
+def _package_summary(addon_id: int) -> dict[str, Any] | None:
+    packages = LATEST_PACKAGES.get(addon_id)
+    if not packages:
+        return None
+    newest = packages[-1]
+    return {"file_name": newest.file_name, "updated": newest.updated.isoformat() if newest.updated else None,
+            "size_bytes": newest.size_bytes, "file_count": newest.file_count,
+            "uncompressed_bytes": newest.uncompressed_bytes, "python_file_count": newest.python_file_count,
+            "python_lines": newest.python_lines}
 
 
 def reviews_at(snapshot: date) -> dict[int, list[AddonReview]]:
@@ -101,7 +149,7 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
           github: dict[str, Any] | None = None, forum: dict[str, Any] | None = None,
           ai_summary: str | None = None, ai_tags: list[str] | None = None,
           author_addons: list[int] | None = None,
-          forked_from: tuple[int, str] | None = None) -> dict[str, Any]:
+          forked_from: tuple[int, str] | None = None, package_size_kb: int | None = 10) -> dict[str, Any]:
     point_version, version_kind = _addons_list_version(anki_version)
     group = author_addons or [addon_id]
     return {
@@ -128,6 +176,7 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
             "description_html": f"<p>{description}</p>" if description else None,
             "description_pre_wrap": update_date < "2023-08",
             "other_items_count": len(group) - 1,
+            "package_size_kb": package_size_kb,
         },
         "github": github,
         "forum": forum,
@@ -135,6 +184,7 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
         "author": {"id": min(group), "addon_count": len(group)},
         "forked_from": {"id": forked_from[0], "evidence": forked_from[1]} if forked_from else None,
         "forks": [],
+        "package": _package_summary(addon_id),
     }
 
 
@@ -150,12 +200,41 @@ def _link_forks(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return records
 
 
+def _activity(user: str) -> dict[str, Any]:
+    return {
+        "releases": [], "release_count": 0, "latest_release_tag": None, "latest_release_at": None,
+        "release_downloads": 0, "contributors": [{"login": user, "contributions": 1}], "contributor_count": 1,
+        "weekly_commits": [0] * 52, "commits_last_year": 0, "open_issue_count": 1, "closed_issue_count": 0,
+        "open_pr_count": 1, "closed_pr_count": 0, "merged_pr_count": 0, "has_issues_enabled": True,
+        "last_issue_closed_at": None, "median_first_response_hours": None, "first_response_sample": 0,
+        "outside_pr_merge_share": None, "outside_prs_decided": 0, "outside_prs_merged": 0,
+    }
+
+
+# Snapshots before activity was tracked, and repos GitHub gave no answer about: all null.
+NO_ACTIVITY = dict.fromkeys(_activity(""))
+KANJI_ACTIVITY = {
+    "releases": [
+        {"tag_name": "v3.0b1", "name": None, "published_at": "2026-09-25T10:00:00", "prerelease": True, "assets": []},
+        {"tag_name": "v2.0", "name": "Version 2", "published_at": "2026-09-20T10:00:00", "prerelease": False,
+         "assets": [{"name": "kanji.ankiaddon", "size": 9000, "download_count": 75}]},
+    ],
+    "release_count": 2, "latest_release_tag": "v2.0", "latest_release_at": "2026-09-20T10:00:00",
+    "release_downloads": 75,
+    "contributors": [{"login": "alice", "contributions": 40}, {"login": "bob", "contributions": 2}],
+    "contributor_count": 2, "weekly_commits": [0] * 51 + [3], "commits_last_year": 3, "closed_issue_count": 6,
+    "closed_pr_count": 1, "merged_pr_count": 4, "last_issue_closed_at": "2026-09-10T08:00:00",
+    "median_first_response_hours": 12.5, "first_response_sample": 8, "outside_pr_merge_share": 0.75,
+    "outside_prs_decided": 4, "outside_prs_merged": 3,
+}
+
+
 def github(user: str, repo: str, *, stars: int = 0, last_commit: str | None = "2026-01-01T10:00:00",
            tests: int | None = 0, actions: int | None = 0, license: str | None = "MIT",
            languages: list[str] | None = None, topics: list[str] | None = None, archived: bool = False,
            manifest: dict[str, Any] | None = None, readme: str | None = None,
            ai_tooling: list[str] | None = None, repo_source: str = "self_reference",
-           fork_source: str | None = None) -> dict[str, Any]:
+           fork_source: str | None = None, activity: dict[str, Any] | None = None) -> dict[str, Any]:
     return {
         "user": user, "repo": repo, "repo_source": repo_source, "languages": languages or ["Python"], "stars": stars,
         "last_commit": last_commit,
@@ -167,6 +246,7 @@ def github(user: str, repo: str, *, stars: int = 0, last_commit: str | None = "2
         "language_bytes": [{"name": (languages or ["Python"])[0], "bytes": 1000}],
         "manifest": manifest, "dependencies": ["requests"] if manifest else [], "readme": readme,
         "ai_tooling_markers": ai_tooling or [], "fork_source": fork_source,
+        **_activity(user), **(activity or {}),
     }
 
 
@@ -187,7 +267,8 @@ def latest_records() -> list[dict[str, Any]]:
               ai_summary="Shows kanji stroke order and readings during review.",
               ai_tags=["dictionary", "card-templates", "mobile-compatible"],
               github=github("alice", "kanji-helper", stars=50, tests=12, actions=2, topics=["japanese", "kanji"],
-                            manifest=_manifest(231000, None), readme="# Kanji Helper\nStroke order for kanji."),
+                            manifest=_manifest(231000, None), readme="# Kanji Helper\nStroke order for kanji.",
+                            activity=KANJI_ACTIVITY),
               forum=forum(11, 30)),
         addon(OCCLUSION, "Image Occlusion Plus", rating=320, likes=310, dislikes=10, update_date="2026-08-01",
               anki_version="2.1.66~", branches=[("2.1.66", "25.09+")],
@@ -202,7 +283,7 @@ def latest_records() -> list[dict[str, Any]]:
               description="Heatmap of review history with streak counter.",
               ai_tags=["statistics", "progress-tracking"],
               github=github("carol", "review-heatmap", stars=200, last_commit="2023-12-01T00:00:00",
-                            tests=None, license="AGPL-3.0", topics=["heatmap"])),
+                            tests=None, license="AGPL-3.0", topics=["heatmap"], activity=NO_ACTIVITY)),
         addon(LEGACY, "Legacy Scheduler", rating=350, likes=200, dislikes=150, update_date="2019-05-01",
               anki_version="2.1.0~", branches=[("2.1.0", None)], description="Old scheduler tweaks.",
               ai_tags=["scheduling", "obsolete"],
@@ -210,14 +291,15 @@ def latest_records() -> list[dict[str, Any]]:
                             license=None)),
         addon(NO_GITHUB, "Simple Timer", rating=15, likes=15, update_date="2025-11-11", anki_version="",
               branches=[("2.1.50", "+")], description="A timer for review sessions. Zeitmesser.", lang="de",
-              author_addons=ALICE_ADDONS,
+              author_addons=ALICE_ADDONS, package_size_kb=None,
               ai_tags=["timer"], forked_from=(KANJI, "ai")),
         addon(VIBE, "Vibe Deck Tools", rating=4, likes=3, dislikes=1, update_date="2026-09-29",
               anki_version="25.09~", branches=[("25.09", "+")], description="Deck tools vibe-coded with claude.",
               ai_declaration=["claude", "vibe-coded"], ai_tags=["deck-management", "beta"],
               forked_from=(LEGACY, "ai"),
               github=github("erin", "vibe-deck", stars=1, last_commit="2026-09-28T12:00:00", license="MIT",
-                            ai_tooling=["claude-code", "agents-md"], topics=["deck"], repo_source="ai")),
+                            ai_tooling=["claude-code", "agents-md"], topics=["deck"], repo_source="ai",
+                            activity={"has_issues_enabled": False})),
         addon(NEW_ADDON, "Kanji Quiz", rating=10, likes=10, update_date="2026-09-25", anki_version="25.02~",
               branches=[("25.02", "+")], description="Quiz yourself on kanji meanings.",
               ai_summary="Kanji meaning quiz.", ai_tags=["quiz", "dictionary"], forked_from=(KANJI, "github_fork"),
@@ -242,10 +324,12 @@ def old_records() -> list[dict[str, Any]]:
     for record in by_id.values():
         # Snapshots collected before authors were tracked: an all-null column, as published.
         record["author"] = None
+        record["package"] = None
         if record["github"]:
             record["github"]["manifest"] = None
             record["github"]["readme"] = None
             record["github"]["dependencies"] = []
+            record["github"].update(NO_ACTIVITY)
     return _link_forks(list(by_id.values()))
 
 
@@ -262,6 +346,9 @@ def _write_snapshot(folder: Path, records: list[dict[str, Any]], snapshot: date,
     reviews = [{"addon_id": addon_id, **r.model_dump()} for addon_id, rs in sorted(reviews_at(snapshot).items())
                for r in rs]
     pq.write_table(pa.Table.from_pylist(reviews, schema=_REVIEW_SCHEMA), folder / "parquet" / "reviews.parquet")
+    packages = [{"addon_id": addon_id, **p.model_dump()} for addon_id, ps in sorted(packages_at(snapshot).items())
+                for p in ps]
+    pq.write_table(pa.Table.from_pylist(packages, schema=_PACKAGE_SCHEMA), folder / "parquet" / "packages.parquet")
     if anki_versions is not None:
         pq.write_table(pa.Table.from_pylist([r.model_dump() for r in anki_versions]),
                        folder / "parquet" / "anki_versions.parquet")
@@ -305,3 +392,7 @@ def domain_anki_versions() -> dict[date, list[AnkiRelease]]:
 
 def domain_reviews() -> dict[date, dict[int, list[AddonReview]]]:
     return {d: reviews_at(d) for d in (OLD, LATEST)}
+
+
+def domain_packages() -> dict[date, dict[int, list[AddonPackage]]]:
+    return {d: packages_at(d) for d in (OLD, LATEST)}

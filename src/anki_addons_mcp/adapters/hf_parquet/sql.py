@@ -8,6 +8,13 @@ import duckdb
 from anki_addons_mcp.domain.errors import InvalidQuery
 
 _ISO_TIMESTAMP = "VARCHAR, ISO timestamp"
+_UNTRACKED = "; NULL in snapshots before 2026-11-01 and when GitHub gave no answer"
+# Explicit types: these fields are null-typed in snapshots before 2026-11-01, and SQL over them must bind on every one.
+_PACKAGE_TYPE = ("STRUCT(file_name VARCHAR, updated VARCHAR, size_bytes BIGINT, file_count BIGINT, "
+                 "uncompressed_bytes BIGINT, python_file_count BIGINT, python_lines BIGINT)")
+_RELEASES_TYPE = ("STRUCT(tag_name VARCHAR, name VARCHAR, published_at VARCHAR, prerelease BOOLEAN, "
+                  "assets STRUCT(name VARCHAR, size BIGINT, download_count BIGINT)[])[]")
+_CONTRIBUTORS_TYPE = "STRUCT(login VARCHAR, contributions BIGINT)[]"
 
 FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("id", "id", "BIGINT, AnkiWeb addon id"),
@@ -41,6 +48,8 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
      "BOOLEAN, AnkiWeb renders the description with preserved line breaks"),
     ("other_items_count", "anki_web.other_items_count",
      "BIGINT, other items the author shared on AnkiWeb (shared decks included)"),
+    ("package_size_kb", "anki_web.package_size_kb",
+     "BIGINT, package size shown on AnkiWeb in kB, rounded to 10 kB: 0 = under 10 kB, NULL = not shown"),
     ("author_id", "CAST(json_extract(to_json(author), '$.id') AS BIGINT)",
      ("BIGINT, derived AnkiWeb author: the smallest addon id among the author's addons, an anonymous label; "
       "NULL in snapshots collected before authors were tracked")),
@@ -51,6 +60,9 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
       "evidence 'github_fork', "
       "'ai' (LLM-detected, may be inaccurate) or 'override'; detection is incomplete")),
     ("forks", "forks", "BIGINT[], addons forked from this one (the reverse of forked_from)"),
+    ("package", f"TRY_CAST(package AS {_PACKAGE_TYPE})",
+     (f"{_PACKAGE_TYPE}, the .ankiaddon package of the branch with the highest min_point_version (see `packages`); "
+      "NULL when the snapshot holds no package of the addon, always in snapshots before 2026-11-01")),
     ("has_github", "github IS NOT NULL", "BOOLEAN"),
     ("github_user", "github.user", "VARCHAR"),
     ("github_repo", "github.repo", "VARCHAR"),
@@ -66,7 +78,8 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("github_tests_count", "github.tests_count", "BIGINT, test files"),
     ("github_license", "github.license", "VARCHAR, SPDX id"),
     ("github_forks", "github.forks", "BIGINT, number of GitHub forks of the repo"),
-    ("github_open_issues", "github.open_issues", "BIGINT"),
+    ("github_open_issues", "github.open_issues",
+     "BIGINT, open issues and open pull requests together; see github_open_issue_count, github_open_pr_count"),
     ("github_size_kb", "github.size_kb", "BIGINT"),
     ("github_topics", "github.topics", "VARCHAR[]"),
     ("github_repo_description", "github.repo_description", "VARCHAR"),
@@ -82,6 +95,46 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("github_dependencies", "TRY_CAST(github.dependencies AS VARCHAR[])", "VARCHAR[], Python dependencies"),
     ("github_readme", "TRY_CAST(github.readme AS VARCHAR)", "VARCHAR, README text"),
     ("github_ai_tooling_markers", "github.ai_tooling_markers", "VARCHAR[], AI coding tool traces in the repo"),
+    ("github_releases", f"TRY_CAST(github.releases AS {_RELEASES_TYPE})",
+     f"{_RELEASES_TYPE}, the newest 100 GitHub releases, drafts excluded{_UNTRACKED}"),
+    ("github_release_count", "TRY_CAST(github.release_count AS BIGINT)", f"BIGINT, length of github_releases{_UNTRACKED}"),
+    ("github_latest_release_tag", "TRY_CAST(github.latest_release_tag AS VARCHAR)",
+     f"VARCHAR, tag of the newest release that is not a prerelease{_UNTRACKED}"),
+    ("github_latest_release_at", "TRY_CAST(github.latest_release_at AS VARCHAR)",
+     f"{_ISO_TIMESTAMP} of the newest release that is not a prerelease{_UNTRACKED}"),
+    ("github_release_downloads", "TRY_CAST(github.release_downloads AS BIGINT)",
+     f"BIGINT, asset downloads over the listed releases; only counts installs distributed through GitHub{_UNTRACKED}"),
+    ("github_contributors", f"TRY_CAST(github.contributors AS {_CONTRIBUTORS_TYPE})",
+     (f"{_CONTRIBUTORS_TYPE}, most active first, at most 100; commits without a GitHub account are not "
+      f"counted{_UNTRACKED}")),
+    ("github_contributor_count", "TRY_CAST(github.contributor_count AS BIGINT)",
+     f"BIGINT, length of github_contributors{_UNTRACKED}"),
+    ("github_weekly_commits", "TRY_CAST(github.weekly_commits AS BIGINT[])",
+     f"BIGINT[], commits to the default branch in each of the last 52 weeks, oldest first{_UNTRACKED}"),
+    ("github_commits_last_year", "TRY_CAST(github.commits_last_year AS BIGINT)",
+     f"BIGINT, sum of github_weekly_commits{_UNTRACKED}"),
+    ("github_open_issue_count", "TRY_CAST(github.open_issue_count AS BIGINT)", f"BIGINT{_UNTRACKED}"),
+    ("github_closed_issue_count", "TRY_CAST(github.closed_issue_count AS BIGINT)", f"BIGINT{_UNTRACKED}"),
+    ("github_open_pr_count", "TRY_CAST(github.open_pr_count AS BIGINT)", f"BIGINT{_UNTRACKED}"),
+    ("github_closed_pr_count", "TRY_CAST(github.closed_pr_count AS BIGINT)",
+     f"BIGINT, pull requests closed without merging{_UNTRACKED}"),
+    ("github_merged_pr_count", "TRY_CAST(github.merged_pr_count AS BIGINT)", f"BIGINT{_UNTRACKED}"),
+    ("github_has_issues_enabled", "TRY_CAST(github.has_issues_enabled AS BOOLEAN)",
+     f"BOOLEAN, false = issues are turned off, unlike a repo with no issues{_UNTRACKED}"),
+    ("github_last_issue_closed_at", "TRY_CAST(github.last_issue_closed_at AS VARCHAR)",
+     f"{_ISO_TIMESTAMP}, latest close among the 20 most recently updated closed issues{_UNTRACKED}"),
+    ("github_median_first_response_hours", "TRY_CAST(github.median_first_response_hours AS DOUBLE)",
+     ("DOUBLE, median wait for a first response over the newest 100 issues and 100 pull requests; unanswered items are "
+      f"left out, so a low value can hide ignored issues{_UNTRACKED}")),
+    ("github_first_response_sample", "TRY_CAST(github.first_response_sample AS BIGINT)",
+     f"BIGINT, items behind github_median_first_response_hours{_UNTRACKED}"),
+    ("github_outside_pr_merge_share", "TRY_CAST(github.outside_pr_merge_share AS DOUBLE)",
+     f"DOUBLE, github_outside_prs_merged / github_outside_prs_decided, NULL when none were decided{_UNTRACKED}"),
+    ("github_outside_prs_decided", "TRY_CAST(github.outside_prs_decided AS BIGINT)",
+     ("BIGINT, among the newest 100 pull requests, those merged or closed that were opened by neither a bot nor an "
+      f"owner, organization member or collaborator{_UNTRACKED}")),
+    ("github_outside_prs_merged", "TRY_CAST(github.outside_prs_merged AS BIGINT)",
+     f"BIGINT, how many of github_outside_prs_decided were merged{_UNTRACKED}"),
     ("has_forum", "forum IS NOT NULL AND forum.anki_forum_url IS NOT NULL", "BOOLEAN"),
     ("forum_url", "forum.anki_forum_url", "VARCHAR"),
     ("forum_topic_slug", "forum.topic_slug", "VARCHAR"),
@@ -110,6 +163,8 @@ ANKI_VERSIONS_VIEW = "anki_versions"
 ANKI_VERSION_COLUMNS: list[tuple[str, str]] = [
     ("version", "VARCHAR, the version as Anki writes it, e.g. 25.09.2 or 2.1.66"),
     ("point_version", "BIGINT, the same encoding as addons.anki_point_version and the branch point versions"),
+    ("release_date", ("DATE, when the version was published as a GitHub release; NULL for a version without one (most "
+                      "before 2.1.22) and in snapshots before 2026-11-01; late for 2.1.15 and 2.1.20")),
 ]
 REVIEWS_VIEW = "reviews"
 REVIEW_COLUMNS: list[tuple[str, str]] = [
@@ -121,6 +176,21 @@ REVIEW_COLUMNS: list[tuple[str, str]] = [
 ]
 # Row position in the parquet file, which lists each addon's reviews newest first: orders reviews of the same day.
 REVIEW_SEQ = "seq"
+PACKAGES_VIEW = "packages"
+PACKAGE_COLUMNS: list[tuple[str, str]] = [
+    ("addon_id", "BIGINT, the addon (addons.id)"),
+    ("file_name", "VARCHAR, the .ankiaddon file"),
+    ("min_point_version", "BIGINT, the branch's minimum Anki point version"),
+    ("updated", "DATE, the branch's date on the addon page"),
+    ("size_bytes", "BIGINT, size of the package file"),
+    ("manifest_json", "VARCHAR, raw manifest.json at the package root; NULL when absent or over 64 kB"),
+    ("config_json", "VARCHAR, raw config.json at the package root; NULL when absent or over 64 kB"),
+    ("file_count", "BIGINT, files in the package, bundled libraries included"),
+    ("uncompressed_bytes", "BIGINT"),
+    ("python_file_count", "BIGINT"),
+    ("python_lines", "BIGINT, lines of .py files up to 5 MB, comments and blank lines included"),
+    ("files", "VARCHAR[], the paths in the package"),
+]
 _DENIED_FUNCTIONS = frozenset({"getenv", "current_setting"})
 
 
@@ -139,9 +209,9 @@ def tags_select(parquet_path: str) -> str:
 
 def anki_versions_select(parquet_path: str | None) -> str:
     if parquet_path is None:
-        return "SELECT NULL::VARCHAR AS version, NULL::BIGINT AS point_version WHERE false"
+        return "SELECT NULL::VARCHAR AS version, NULL::BIGINT AS point_version, NULL::DATE AS release_date WHERE false"
     escaped = parquet_path.replace("'", "''")
-    return f"SELECT version, point_version FROM read_parquet('{escaped}')"
+    return f"SELECT version, point_version, release_date FROM read_parquet('{escaped}')"
 
 
 def reviews_select(parquet_path: str) -> str:
@@ -151,11 +221,18 @@ def reviews_select(parquet_path: str) -> str:
             f"FROM read_parquet('{escaped}', file_row_number = true)")
 
 
+def packages_select(parquet_path: str) -> str:
+    escaped = parquet_path.replace("'", "''")
+    columns = ", ".join(name for name, _ in PACKAGE_COLUMNS)
+    return f"SELECT {columns} FROM read_parquet('{escaped}')"
+
+
 def schema_description() -> str:
     lines = [f"- {name}: {desc}" for name, _, desc in FLAT_COLUMNS]
     tag_lines = [f"- {name}: {desc}" for name, desc in TAG_COLUMNS]
     version_lines = [f"- {name}: {desc}" for name, desc in ANKI_VERSION_COLUMNS]
     review_lines = [f"- {name}: {desc}" for name, desc in REVIEW_COLUMNS]
+    package_lines = [f"- {name}: {desc}" for name, desc in PACKAGE_COLUMNS]
     return (f"Table `{SQL_VIEW}` (one row per addon of the requested snapshot):\n" + "\n".join(lines)
             + f"\n\nTable `{TAGS_VIEW}` (the tag vocabulary of the snapshot, quote \"group\"):\n"
             + "\n".join(tag_lines)
@@ -165,7 +242,10 @@ def schema_description() -> str:
             + f"\n\nTable `{REVIEWS_VIEW}` (AnkiWeb user reviews, one row per review; join on "
             f"{SQL_VIEW}.id = {REVIEWS_VIEW}.addon_id; reviewers are anonymous, and the vote counts can differ "
             f"slightly from {SQL_VIEW}.likes/dislikes):\n"
-            + "\n".join(review_lines))
+            + "\n".join(review_lines)
+            + f"\n\nTable `{PACKAGES_VIEW}` (the .ankiaddon packages AnkiWeb serves, one row per addon branch; join on "
+            f"{SQL_VIEW}.id = {PACKAGES_VIEW}.addon_id; empty in snapshots before 2026-11-01):\n"
+            + "\n".join(package_lines))
 
 
 def _walk(node: Any, ctes: set[str], tables: list[tuple[str, str, str]]) -> None:

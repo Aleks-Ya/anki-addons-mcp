@@ -13,6 +13,7 @@ AUTHOR_ID_DESCRIPTION = ("Derived AnkiWeb author: the smallest addon id among th
                          "were tracked.")
 FORK_DESCRIPTION = ("Fork relations: detection is incomplete (a fork that neither uses a GitHub fork nor links the "
                     "original from its description is missed), and 'ai' evidence may be inaccurate.")
+GITHUB_ACTIVITY_NULL = "Null in snapshots before 2026-11-01 and when GitHub gave no answer at collection time."
 _Z = 1.96
 
 
@@ -70,6 +71,9 @@ class AnkiWebInfo(BaseModel):
     description_pre_wrap: bool = False
     other_items_count: int | None = Field(
         default=None, description="Other items the author shared on AnkiWeb, shared decks included")
+    package_size_kb: int | None = Field(
+        default=None, description="Package size shown on AnkiWeb in kB, rounded to 10 kB: 0 means under 10 kB, null "
+                                  "means the page showed no size")
 
     @field_validator("update_date", "anki_version", "contact_author_url", "description_language", mode="before")
     @classmethod
@@ -114,6 +118,25 @@ class Manifest(BaseModel):
     max_version_kind: Kind = VersionKind.UNKNOWN
 
 
+class ReleaseAsset(BaseModel):
+    name: str | None = None
+    size: int | None = None
+    download_count: int | None = None
+
+
+class GithubRelease(BaseModel):
+    tag_name: str | None = None
+    name: str | None = None
+    published_at: str | None = None
+    prerelease: bool = False
+    assets: list[ReleaseAsset] = Field(default_factory=list)
+
+
+class GithubContributor(BaseModel):
+    login: str | None = None
+    contributions: int | None = None
+
+
 class GithubInfo(BaseModel):
     user: str | None = None
     repo: str | None = None
@@ -126,7 +149,9 @@ class GithubInfo(BaseModel):
     tests_count: int | None = None
     license: str | None = None
     forks: int | None = None
-    open_issues: int | None = None
+    open_issues: int | None = Field(
+        default=None, description="Open issues and open pull requests together; open_issue_count and open_pr_count "
+                                  "separate them")
     size_kb: int | None = None
     topics: list[str] = Field(default_factory=list)
     repo_description: str | None = None
@@ -141,6 +166,46 @@ class GithubInfo(BaseModel):
     ai_tooling_markers: list[str] = Field(default_factory=list)
     fork_source: str | None = Field(
         default=None, description="Root repo (owner/repo) of the GitHub fork network when the repo is a fork")
+    releases: list[GithubRelease] | None = Field(
+        default=None, description="The newest 100 GitHub releases, drafts excluded. get_addon omits them unless "
+                                  f"requested. {GITHUB_ACTIVITY_NULL}")
+    release_count: int | None = Field(default=None, description=f"Length of releases. {GITHUB_ACTIVITY_NULL}")
+    latest_release_tag: str | None = Field(default=None, description="Newest release that is not a prerelease")
+    latest_release_at: str | None = Field(default=None, description="Newest release that is not a prerelease")
+    release_downloads: int | None = Field(
+        default=None, description="Asset downloads over the listed releases: real install numbers, but only for "
+                                  f"addons distributed through GitHub releases. {GITHUB_ACTIVITY_NULL}")
+    contributors: list[GithubContributor] | None = Field(
+        default=None, description="Most active first, at most 100; commits made without a GitHub account are not "
+                                  f"counted. {GITHUB_ACTIVITY_NULL}")
+    contributor_count: int | None = Field(default=None, description=f"Length of contributors. {GITHUB_ACTIVITY_NULL}")
+    weekly_commits: list[int] | None = Field(
+        default=None, description="Commits to the default branch in each of the last 52 weeks, oldest first; also "
+                                  f"null when GitHub was still computing them. {GITHUB_ACTIVITY_NULL}")
+    commits_last_year: int | None = Field(default=None, description=f"Sum of weekly_commits. {GITHUB_ACTIVITY_NULL}")
+    open_issue_count: int | None = Field(default=None, description=GITHUB_ACTIVITY_NULL)
+    closed_issue_count: int | None = Field(default=None, description=GITHUB_ACTIVITY_NULL)
+    open_pr_count: int | None = Field(default=None, description=GITHUB_ACTIVITY_NULL)
+    closed_pr_count: int | None = Field(
+        default=None, description=f"Pull requests closed without merging. {GITHUB_ACTIVITY_NULL}")
+    merged_pr_count: int | None = Field(default=None, description=GITHUB_ACTIVITY_NULL)
+    has_issues_enabled: bool | None = Field(
+        default=None, description=f"False means issues are turned off, not that there are none. {GITHUB_ACTIVITY_NULL}")
+    last_issue_closed_at: str | None = Field(
+        default=None, description="Latest close among the 20 most recently updated closed issues")
+    median_first_response_hours: float | None = Field(
+        default=None, description="Median wait for a first response over the newest 100 issues and 100 pull requests. "
+                                  "Items nobody answered are left out, so a low median can hide many ignored issues; "
+                                  "first_response_sample says how many items it rests on")
+    first_response_sample: int | None = Field(
+        default=None, description=f"Items behind median_first_response_hours. {GITHUB_ACTIVITY_NULL}")
+    outside_pr_merge_share: float | None = Field(
+        default=None, description="outside_prs_merged / outside_prs_decided, null when none were decided. A private "
+                                  "organization member can look like an outside author")
+    outside_prs_decided: int | None = Field(
+        default=None, description="Among the newest 100 pull requests, those merged or closed that were opened by "
+                                  "neither a bot nor an owner, organization member or collaborator")
+    outside_prs_merged: int | None = Field(default=None, description="How many of outside_prs_decided were merged")
 
     @computed_field
     def url(self) -> str | None:
@@ -176,6 +241,38 @@ class AuthorInfo(BaseModel):
     addon_count: int = Field(description="Number of the author's addons in the snapshot")
 
 
+class PackageSummary(BaseModel):
+    file_name: str
+    updated: str | None = None
+    size_bytes: int | None = None
+    file_count: int | None = Field(default=None, description="Files in the package, bundled libraries included")
+    uncompressed_bytes: int | None = None
+    python_file_count: int | None = None
+    python_lines: int | None = Field(
+        default=None, description="Lines of .py files up to 5 MB, comments and blank lines included")
+
+
+class AddonPackage(BaseModel):
+    file_name: str
+    min_point_version: int | None = Field(default=None, description="The branch's minimum Anki point version")
+    updated: date | None = Field(default=None, description="The branch's date on the addon page")
+    size_bytes: int | None = None
+    manifest_json: str | None = Field(
+        default=None, description="Raw manifest.json at the package root; null when absent, over 64 kB or not requested")
+    config_json: str | None = Field(
+        default=None, description="Raw config.json at the package root; null when absent, over 64 kB or not requested")
+    file_count: int | None = Field(default=None, description="Files in the package, bundled libraries included")
+    uncompressed_bytes: int | None = None
+    python_file_count: int | None = None
+    python_lines: int | None = Field(
+        default=None, description="Lines of .py files up to 5 MB, comments and blank lines included")
+    files: list[str] = Field(default_factory=list, description="Paths in the package, if requested; compare "
+                                                               "with file_count to see whether the list was cut")
+    download_url: str | None = Field(
+        default=None, description="Where the .ankiaddon file can be downloaded; null when the server reads a local "
+                                  "dataset. The file stays under its author's license, not the dataset's CC0")
+
+
 class AddonDetails(BaseModel):
     id: int
     anki_web: AnkiWebInfo
@@ -186,6 +283,10 @@ class AddonDetails(BaseModel):
     forked_from: ForkRelation | None = Field(
         default=None, description="The addon this one was forked from; an addon has at most one. " + FORK_DESCRIPTION)
     forks: list[int] = Field(default_factory=list, description="Addons forked from this one. " + FORK_DESCRIPTION)
+    package: PackageSummary | None = Field(
+        default=None, description="The package of the branch with the highest minimum Anki version; "
+                                  "get_addon_packages lists all branches. Null when the snapshot holds no package of "
+                                  "the addon, always in snapshots before 2026-11-01")
     description: str | None = None
     description_html: str | None = None
     readme: str | None = None
@@ -262,6 +363,10 @@ class Tag(BaseModel):
 class AnkiRelease(BaseModel):
     version: str = Field(description="The version as Anki writes it, e.g. 25.09.2 or 2.1.66")
     point_version: int = Field(description="Anki's sortable integer encoding: 2.1.x -> x, YY.MM.PP -> YYMMPP")
+    release_date: date | None = Field(
+        default=None, description="When the version was published as a GitHub release (UTC); null for a version "
+                                  "without one, which covers most before 2.1.22, and in snapshots before 2026-11-01. "
+                                  "2.1.15 and 2.1.20 were published late, so their dates are later than the releases")
 
 
 class ReviewVote(StrEnum):

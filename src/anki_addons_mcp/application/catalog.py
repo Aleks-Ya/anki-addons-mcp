@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from anki_addons_mcp.application.tags import TagService
 from anki_addons_mcp.domain.errors import AddonNotFound, InvalidQuery
-from anki_addons_mcp.domain.models import AddonCard, AddonDetails, AddonReviews, Page, TextKind
+from anki_addons_mcp.domain.models import AddonCard, AddonDetails, AddonPackage, AddonReviews, Page, TextKind
 from anki_addons_mcp.domain.ports import AddonRepository
 from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, ReviewQuery, SortField
 
@@ -41,6 +41,12 @@ def _without_links(details: AddonDetails) -> AddonDetails:
     anki_web = details.anki_web.model_copy(update={"links": []})
     github = details.github.model_copy(update={"links": []}) if details.github else None
     return details.model_copy(update={"anki_web": anki_web, "github": github})
+
+
+def _without_releases(details: AddonDetails) -> AddonDetails:
+    if details.github is None:
+        return details
+    return details.model_copy(update={"github": details.github.model_copy(update={"releases": None})})
 
 
 def check_limit(limit: int) -> int:
@@ -111,12 +117,15 @@ class CatalogService:
     def get(
         self, addon_id: int, snapshot: date | None = None, include_description: bool = False,
         include_readme: bool = False, max_chars: int | None = None, include_links: bool = True,
+        include_releases: bool = True,
     ) -> AddonDetails:
         details = self._repository.get_addon(addon_id, snapshot)
         if details is None:
             raise AddonNotFound(addon_id, snapshot)
         if not include_links:
             details = _without_links(details)
+        if not include_releases:
+            details = _without_releases(details)
         update: dict[str, str | None] = {}
         if include_description:
             update["description"] = self.text(addon_id, TextKind.DESCRIPTION, max_chars, snapshot).text
@@ -136,6 +145,18 @@ class CatalogService:
         if self._repository.get_addon(addon_id, snapshot) is None:
             raise AddonNotFound(addon_id, snapshot)
         return self._repository.list_reviews(addon_id, query, snapshot)
+
+    def packages(
+        self, addon_id: int, snapshot: date | None = None, include_manifest: bool = True, include_config: bool = True,
+        include_files: bool = True, max_files: int | None = None,
+    ) -> list[AddonPackage]:
+        if self._repository.get_addon(addon_id, snapshot) is None:
+            raise AddonNotFound(addon_id, snapshot)
+        return [package.model_copy(update={
+            "manifest_json": package.manifest_json if include_manifest else None,
+            "config_json": package.config_json if include_config else None,
+            "files": package.files[:max_files] if include_files else [],
+        }) for package in self._repository.list_packages(addon_id, snapshot)]
 
     def text(
         self, addon_id: int, kind: TextKind, max_chars: int | None = None, snapshot: date | None = None

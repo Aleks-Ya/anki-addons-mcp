@@ -13,6 +13,8 @@ from anki_addons_mcp.adapters.hf_parquet.sql import (
     ANKI_VERSIONS_VIEW,
     FLAT_COLUMNS,
     HELPER_COLUMNS,
+    PACKAGE_COLUMNS,
+    PACKAGES_VIEW,
     REVIEW_SEQ,
     REVIEWS_VIEW,
     SEARCH_COLUMNS,
@@ -21,6 +23,7 @@ from anki_addons_mcp.adapters.hf_parquet.sql import (
     anki_versions_select,
     flat_select,
     json_safe,
+    packages_select,
     reviews_select,
     schema_description,
     tags_select,
@@ -33,6 +36,7 @@ from anki_addons_mcp.domain.models import (
     AddonCard,
     AddonDetails,
     AddonHistoryPoint,
+    AddonPackage,
     AddonReview,
     AddonReviews,
     Aggregation,
@@ -196,6 +200,7 @@ class _State:
         self.tag_tables: dict[date, str] = {}
         self.anki_version_tables: dict[date, str] = {}
         self.review_tables: dict[date, str] = {}
+        self.package_tables: dict[date, str] = {}
         self.fts: set[str] = set()
         self.lock = threading.RLock()
         self.fts_available = self._load_fts()
@@ -278,6 +283,21 @@ class _State:
                 self.con.execute(f"CREATE TABLE {name} AS {reviews_select(path)}")
                 self.review_tables[resolved] = name
             return self.review_tables[resolved]
+
+    def package_table(self, snapshot: date | None) -> str:
+        resolved = snapshot or self.source.latest_date()
+        with self.lock:
+            if resolved in self.package_tables:
+                return self.package_tables[resolved]
+        if resolved not in self.source.snapshot_dates():
+            raise SnapshotNotFound(resolved)
+        path = str(self.source.packages_file(resolved))
+        with self.lock:
+            if resolved not in self.package_tables:
+                name = f"packages_{resolved.strftime('%Y%m%d')}"
+                self.con.execute(f"CREATE TABLE {name} AS {packages_select(path)}")
+                self.package_tables[resolved] = name
+            return self.package_tables[resolved]
 
     def _index(self, table: str) -> None:
         if not self.fts_available:
@@ -441,6 +461,19 @@ class DuckDbAddonRepository(AddonRepository):
         return AddonReviews(addon_id=addon_id, total=counts["total"], likes=counts["likes"],
                             dislikes=counts["dislikes"], offset=query.offset, limit=query.limit, items=items)
 
+    def list_packages(self, addon_id: int, snapshot: date | None = None) -> list[AddonPackage]:
+        state = self._current()
+        table = state.package_table(snapshot)
+        columns = ", ".join(name for name, _ in PACKAGE_COLUMNS if name != "addon_id")
+        cursor = state.cursor()
+        try:
+            cursor.execute(f"SELECT {columns} FROM {table} WHERE addon_id = ? ORDER BY min_point_version", [addon_id])
+            return [AddonPackage.model_validate({**row, "files": row["files"] or [],
+                                                 "download_url": state.source.package_url(addon_id, row["file_name"])})
+                    for row in _dicts(cursor)]
+        finally:
+            cursor.close()
+
     def get_aggregation(self, snapshot: date | None = None) -> Aggregation:
         row = self._select(
             "SELECT count(*) AS addon_number, count_if(has_github) AS addon_with_github_number, "
@@ -476,7 +509,7 @@ class DuckDbAddonRepository(AddonRepository):
         table = state.anki_version_table(snapshot)
         cursor = state.cursor()
         try:
-            cursor.execute(f"SELECT version, point_version FROM {table} ORDER BY point_version DESC")
+            cursor.execute(f"SELECT version, point_version, release_date FROM {table} ORDER BY point_version DESC")
             return [AnkiRelease.model_validate(row) for row in _dicts(cursor)]
         finally:
             cursor.close()
@@ -493,16 +526,18 @@ class DuckDbAddonRepository(AddonRepository):
         tag_table = state.tag_table(snapshot)
         anki_version_table = state.anki_version_table(snapshot)
         review_table = state.review_table(snapshot)
+        package_table = state.package_table(snapshot)
         cursor = state.cursor()
         timer = threading.Timer(timeout_seconds, cursor.interrupt)
         try:
-            validate_readonly_select(cursor, sql, {SQL_VIEW, TAGS_VIEW, ANKI_VERSIONS_VIEW, REVIEWS_VIEW})
+            validate_readonly_select(cursor, sql, {SQL_VIEW, TAGS_VIEW, ANKI_VERSIONS_VIEW, REVIEWS_VIEW, PACKAGES_VIEW})
             helpers = ", ".join(HELPER_COLUMNS)
             cursor.execute(f"CREATE OR REPLACE TEMP VIEW {SQL_VIEW} AS SELECT * EXCLUDE ({helpers}) FROM {relation}")
             cursor.execute(f"CREATE OR REPLACE TEMP VIEW {TAGS_VIEW} AS SELECT * FROM {tag_table}")
             cursor.execute(f"CREATE OR REPLACE TEMP VIEW {ANKI_VERSIONS_VIEW} AS SELECT * FROM {anki_version_table}")
             cursor.execute(f"CREATE OR REPLACE TEMP VIEW {REVIEWS_VIEW} AS "
                            f"SELECT * EXCLUDE ({REVIEW_SEQ}) FROM {review_table}")
+            cursor.execute(f"CREATE OR REPLACE TEMP VIEW {PACKAGES_VIEW} AS SELECT * FROM {package_table}")
             timer.start()
             try:
                 cursor.execute(sql)

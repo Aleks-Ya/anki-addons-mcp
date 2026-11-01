@@ -66,6 +66,47 @@ def test_reviews_table(duckdb_repository: DuckDbAddonRepository) -> None:
     assert old.rows == [[3]]
 
 
+def test_packages_table(duckdb_repository: DuckDbAddonRepository) -> None:
+    assert "Table `packages`" in duckdb_repository.sql_schema()
+    joined = duckdb_repository.execute_readonly(
+        "SELECT a.title, count(*), sum(p.python_lines), max(len(p.files)) FROM packages p "
+        "JOIN addons a ON a.id = p.addon_id GROUP BY 1 ORDER BY 1", None, 10, 5)
+    assert joined.rows == [["Image Occlusion Plus", 1, 900, 1], ["Kanji Helper", 2, 570, 3]]
+    columns = duckdb_repository.execute_readonly("SELECT * FROM packages LIMIT 1", None, 10, 5).columns
+    assert columns == ["addon_id", "file_name", "min_point_version", "updated", "size_bytes", "manifest_json",
+                       "config_json", "file_count", "uncompressed_bytes", "python_file_count", "python_lines", "files"]
+    old = duckdb_repository.execute_readonly("SELECT count(*) FROM packages", OLD, 10, 5)
+    assert old.rows == [[0]]
+
+
+def test_anki_versions_release_date_column(duckdb_repository: DuckDbAddonRepository) -> None:
+    latest = duckdb_repository.execute_readonly(
+        "SELECT release_date FROM anki_versions ORDER BY point_version DESC LIMIT 1", None, 10, 5)
+    assert latest.rows == [["2026-09-23"]]
+    old = duckdb_repository.execute_readonly("SELECT count(release_date) FROM anki_versions", OLD, 10, 5)
+    assert old.rows == [[0]]
+
+
+# The columns stay typed where the parquet field is null-typed, so the same SQL binds on every snapshot.
+@pytest.mark.parametrize(("snapshot", "expected"), [(None, [2, 1, 6, 1, 2, 75, 1, 12.5]),
+                                                    (OLD, [0, 0, 0, 0, 0, None, 0, None])])
+def test_dataset_4_1_columns(duckdb_repository: DuckDbAddonRepository, snapshot: date | None,
+                             expected: list[object]) -> None:
+    result = duckdb_repository.execute_readonly(
+        "SELECT count(package), count(*) FILTER (len(github_releases) > 0), count(github_contributors), "
+        "count(*) FILTER (github_commits_last_year > 0), count(*) FILTER (package.size_bytes > 0), "
+        "sum(github_releases[2].assets[1].download_count), count(*) FILTER (NOT github_has_issues_enabled), "
+        "max(github_median_first_response_hours) FROM addons", snapshot, 10, 5)
+    assert result.rows == [expected]
+
+
+@pytest.mark.parametrize("snapshot", [None, OLD])
+def test_package_size_kb_column(duckdb_repository: DuckDbAddonRepository, snapshot: date | None) -> None:
+    result = duckdb_repository.execute_readonly(
+        "SELECT count(*), count(package_size_kb) FROM addons", snapshot, 10, 5)
+    assert result.rows == [[8, 7]]
+
+
 @pytest.mark.parametrize(("snapshot", "expected"), [(None, [6, 8, 1]), (OLD, [0, 8, 2])])
 def test_dataset_2_4_columns(duckdb_repository: DuckDbAddonRepository, snapshot: date | None,
                              expected: list[int]) -> None:
