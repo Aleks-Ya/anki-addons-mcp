@@ -1,5 +1,5 @@
 import math
-from datetime import date, datetime
+from datetime import date
 from enum import StrEnum
 from typing import Annotated, Any
 
@@ -402,7 +402,8 @@ class Page[T](BaseModel):
 class SnapshotInfo(BaseModel):
     date: date
     latest: bool
-    report_generation_date: datetime | None = None
+    report_generation_date: str | None = Field(
+        default=None, description="ISO timestamp as the dataset writes it, with no timezone")
     script_version: str | None = None
 
 

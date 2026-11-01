@@ -36,6 +36,7 @@ def test_list_snapshots(repository: AddonRepository) -> None:
     assert [s.date for s in snapshots] == [OLD, LATEST]
     assert [s.latest for s in snapshots] == [False, True]
     assert snapshots[1].script_version == "9.9.9"
+    assert snapshots[1].report_generation_date == "2026-10-01T09:30:27"
 
 
 def test_get_addon(repository: AddonRepository) -> None:

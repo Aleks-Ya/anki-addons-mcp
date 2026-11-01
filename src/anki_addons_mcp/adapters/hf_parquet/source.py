@@ -1,7 +1,7 @@
 import json
 import logging
 import threading
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -54,11 +54,10 @@ class DatasetSource(Protocol):
 
 
 def _info(raw: dict[str, Any], snapshot: date, latest: bool) -> SnapshotInfo:
-    generated = raw.get("report_generation_date")
     return SnapshotInfo(
         date=snapshot,
         latest=latest,
-        report_generation_date=datetime.fromisoformat(generated) if generated else None,
+        report_generation_date=raw.get("report_generation_date") or None,
         script_version=raw.get("script_version"),
     )
 

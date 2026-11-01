@@ -48,6 +48,18 @@ async def test_lists_tools_with_read_only_annotations(client: Client, repository
         assert tool.description
 
 
+async def test_output_schemas_have_no_date_time_format(client: Client) -> None:
+    # The format requires a timezone and the dataset's timestamps have none, so strict clients would reject the result.
+    offending = [tool.name for tool in (await client.list_tools()).tools
+                 if '"format": "date-time"' in json.dumps(tool.output_schema)]
+    assert offending == []
+
+
+async def test_list_snapshots_keeps_the_timestamp_as_published(client: Client) -> None:
+    snapshots = (await call(client, "list_snapshots"))["result"]
+    assert snapshots[1]["report_generation_date"] == "2026-10-01T09:30:27"
+
+
 async def test_lists_prompts_and_resources(client: Client) -> None:
     assert {p.name for p in (await client.list_prompts()).prompts} == EXPECTED_PROMPTS
     assert {str(r.uri) for r in (await client.list_resources()).resources} == {
