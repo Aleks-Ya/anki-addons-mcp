@@ -83,13 +83,15 @@ authors were tracked. `get_addon_description` returns plain text, or the author'
 `format=html`. `get_addon_reviews` lists an addon's AnkiWeb user reviews newest first (anonymous, with the
 author's reply when there is one) and filters them by `vote`, `contains` text and `since` date, e.g. to find reports
 of breakage on a new Anki. `get_addon` shows how the Anki Forum topic was found in `forum.topic_source`
-(`override`, `contact_author`, `ai` or `most_linked`).
+(`override`, `contact_author`, `ai`, `most_linked` or `title_match`).
 `get_addon` also shows GitHub activity from 2026-11-01 on: commits per week, contributors, separate issue and pull
 request counts, maintainer response time and releases (the release list with `include=releases`). `assess_maintenance`
 reports these as signals and reasons, while its label still rests on dates and the archived flag alone.
 `get_addon_packages` lists the `.ankiaddon` packages of an addon, one per branch (sizes, file and Python line counts,
-download URL; raw `manifest.json`, `config.json` and the file list with `include`). It is empty for snapshots before
-2026-11-01, and the packages stay under their authors' licenses, not the dataset's CC0.
+bytes per detected language, download URL; raw `manifest.json`, `config.json` and the file list with `include`).
+It is empty for snapshots before 2026-11-01, and the packages stay under their authors' licenses, not the dataset's
+CC0. The `language` filter matches the languages of the GitHub repo and those detected in the package, and
+`get_statistics` groups by either (`primary_language`, `package_language`).
 Fork relations come from the dataset: `get_addon` shows `forked_from`, the one addon it was forked from or null
 (with its evidence: `github_fork`, `ai` or `override`), `forks` (any number) and `github.fork_source`; cards carry
 the ids. `search_addons` and `filter_addons` filter by

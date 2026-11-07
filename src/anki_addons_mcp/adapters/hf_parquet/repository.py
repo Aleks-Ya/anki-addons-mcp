@@ -82,6 +82,7 @@ _SORT_EXPR = {
 _SCALAR_GROUPS = {
     GroupField.LICENSE: "github_license",
     GroupField.PRIMARY_LANGUAGE: "github_primary_language",
+    GroupField.PACKAGE_LANGUAGE: "package.primary_language",
     GroupField.DESCRIPTION_LANGUAGE: "description_language",
     GroupField.ANKI_VERSION: "anki_version",
     GroupField.ANKI_VERSION_KIND: "anki_version_kind",
@@ -148,15 +149,20 @@ def _github_filters(f: AddonFilters, add: _Add) -> None:
         add("has_github = ?", f.has_github)
     if f.has_tests is not None:
         add("(coalesce(github_tests_count, 0) > 0) = ?", f.has_tests)
-    if f.language is not None:
-        add("(list_contains(list_transform(github_languages, lambda x: lower(x)), lower(?))"
-            " OR lower(github_primary_language) = lower(?))", f.language, f.language)
     if f.github_user is not None:
         add("lower(github_user) = lower(?)", f.github_user)
     if f.archived is not None:
         add("coalesce(github_archived, false) = ?", f.archived)
     if f.has_ai_tooling is not None:
         add("(coalesce(len(github_ai_tooling_markers), 0) > 0) = ?", f.has_ai_tooling)
+
+
+def _language_filters(f: AddonFilters, add: _Add) -> None:
+    if f.language is not None:
+        add("(list_contains(list_transform(github_languages, lambda x: lower(x)), lower(?))"
+            " OR lower(github_primary_language) = lower(?)"
+            " OR list_contains(list_transform(package.language_bytes, lambda x: lower(x.name)), lower(?)))",
+            f.language, f.language, f.language)
 
 
 def _version_and_tag_filters(f: AddonFilters, add: _Add) -> None:
@@ -183,6 +189,7 @@ def _filters_sql(f: AddonFilters) -> tuple[list[str], list[Any]]:
     _anki_web_filters(f, add)
     _fork_filters(f, add)
     _github_filters(f, add)
+    _language_filters(f, add)
     _version_and_tag_filters(f, add)
     return [f"coalesce({c}, false)" for c in clauses], params
 
@@ -469,6 +476,7 @@ class DuckDbAddonRepository(AddonRepository):
         try:
             cursor.execute(f"SELECT {columns} FROM {table} WHERE addon_id = ? ORDER BY min_point_version", [addon_id])
             return [AddonPackage.model_validate({**row, "files": row["files"] or [],
+                                                 "language_bytes": row["language_bytes"] or [],
                                                  "download_url": state.source.package_url(addon_id, row["file_name"])})
                     for row in _dicts(cursor)]
         finally:

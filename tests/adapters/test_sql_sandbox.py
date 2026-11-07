@@ -74,7 +74,8 @@ def test_packages_table(duckdb_repository: DuckDbAddonRepository) -> None:
     assert joined.rows == [["Image Occlusion Plus", 1, 900, 1], ["Kanji Helper", 2, 570, 3]]
     columns = duckdb_repository.execute_readonly("SELECT * FROM packages LIMIT 1", None, 10, 5).columns
     assert columns == ["addon_id", "file_name", "min_point_version", "updated", "size_bytes", "manifest_json",
-                       "config_json", "file_count", "uncompressed_bytes", "python_file_count", "python_lines", "files"]
+                       "config_json", "file_count", "uncompressed_bytes", "python_file_count", "python_lines", "files",
+                       "language_bytes"]
     old = duckdb_repository.execute_readonly("SELECT count(*) FROM packages", OLD, 10, 5)
     assert old.rows == [[0]]
 
@@ -97,6 +98,19 @@ def test_dataset_4_1_columns(duckdb_repository: DuckDbAddonRepository, snapshot:
         "count(*) FILTER (github_commits_last_year > 0), count(*) FILTER (package.size_bytes > 0), "
         "sum(github_releases[2].assets[1].download_count), count(*) FILTER (NOT github_has_issues_enabled), "
         "max(github_median_first_response_hours) FROM addons", snapshot, 10, 5)
+    assert result.rows == [expected]
+
+
+# Dataset 4.2.0 renamed github.forks and added package languages; package is null-typed in OLD.
+@pytest.mark.parametrize(("snapshot", "expected"), [(None, [7, 2, 1, 3]), (OLD, [6, 0, 0, 0])])
+def test_dataset_4_2_columns(duckdb_repository: DuckDbAddonRepository, snapshot: date | None,
+                             expected: list[object]) -> None:
+    result = duckdb_repository.execute_readonly(
+        "SELECT (SELECT sum(github_fork_count) FROM addons), "
+        "(SELECT count(package.primary_language) FROM addons), "
+        "(SELECT count(*) FROM addons WHERE list_contains(list_transform(package.language_bytes, lambda x: x.name), "
+        "'handlebars')), "
+        "(SELECT count(*) FROM packages WHERE len(language_bytes) > 0)", snapshot, 10, 5)
     assert result.rows == [expected]
 
 

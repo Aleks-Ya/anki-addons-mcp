@@ -12,6 +12,7 @@ from anki_addons_mcp.domain.models import (
     AddonPackage,
     AddonReview,
     AnkiRelease,
+    LanguageBytes,
     ReviewVote,
     SnapshotInfo,
     Tag,
@@ -71,21 +72,30 @@ LATEST_REVIEWS: dict[int, list[AddonReview]] = {
 _REVIEW_SCHEMA = pa.schema([("addon_id", pa.int64()), ("date", pa.date32()), ("vote", pa.large_string()),
                             ("text", pa.large_string()), ("author_reply", pa.large_string())])
 
+
+
+def _languages(**byte_counts: int) -> list[LanguageBytes]:
+    return [LanguageBytes(name=name, bytes=count) for name, count in byte_counts.items()]
+
+
 # Sorted by addon and minimum Anki version, as published. Only the LATEST snapshot holds packages.
+# KANJI's newest package ships handlebars, which its GitHub repo does not list.
 LATEST_PACKAGES: dict[int, list[AddonPackage]] = {
     KANJI: [
         AddonPackage(file_name="0-2021-03-01-aaaaaaaaaaaa.ankiaddon", min_point_version=0, updated=date(2021, 3, 1),
                      size_bytes=5000, config_json='{"font": "serif"}', file_count=2, uncompressed_bytes=12000,
-                     python_file_count=1, python_lines=120, files=["__init__.py", "config.json"]),
+                     python_file_count=1, python_lines=120, files=["__init__.py", "config.json"],
+                     language_bytes=_languages(python=3000, json=20)),
         AddonPackage(file_name="250200-2026-09-20-bbbbbbbbbbbb.ankiaddon", min_point_version=250200,
                      updated=date(2026, 9, 20), size_bytes=9000, manifest_json='{"name": "Kanji Helper"}',
                      config_json='{"font": "sans"}', file_count=3, uncompressed_bytes=30000, python_file_count=2,
-                     python_lines=450, files=["__init__.py", "manifest.json", "lib/strokes.py"]),
+                     python_lines=450, files=["__init__.py", "manifest.json", "lib/strokes.py"],
+                     language_bytes=_languages(json=12000, python=9000, handlebars=300)),
     ],
     OCCLUSION: [
         AddonPackage(file_name="66-2026-08-01-cccccccccccc.ankiaddon", min_point_version=66, updated=date(2026, 8, 1),
                      size_bytes=70000, file_count=1, uncompressed_bytes=90000, python_file_count=1, python_lines=900,
-                     files=["__init__.py"]),
+                     files=["__init__.py"], language_bytes=_languages(python=60000, javascript=20000)),
     ],
 }
 _PACKAGE_SCHEMA = pa.schema([
@@ -93,7 +103,9 @@ _PACKAGE_SCHEMA = pa.schema([
     ("updated", pa.date32()), ("size_bytes", pa.int64()), ("manifest_json", pa.string()), ("config_json", pa.string()),
     ("file_count", pa.int64()), ("uncompressed_bytes", pa.int64()), ("python_file_count", pa.int64()),
     ("python_lines", pa.int64()), ("files", pa.list_(pa.string())),
+    ("language_bytes", pa.list_(pa.struct([("name", pa.string()), ("bytes", pa.int64())]))),
 ])
+_DATA_LANGUAGES = {"json", "yaml"}
 
 
 def packages_at(snapshot: date) -> dict[int, list[AddonPackage]]:
@@ -108,7 +120,9 @@ def _package_summary(addon_id: int) -> dict[str, Any] | None:
     return {"file_name": newest.file_name, "updated": newest.updated.isoformat() if newest.updated else None,
             "size_bytes": newest.size_bytes, "file_count": newest.file_count,
             "uncompressed_bytes": newest.uncompressed_bytes, "python_file_count": newest.python_file_count,
-            "python_lines": newest.python_lines}
+            "python_lines": newest.python_lines,
+            "primary_language": next((lb.name for lb in newest.language_bytes if lb.name not in _DATA_LANGUAGES), None),
+            "language_bytes": [lb.model_dump() for lb in newest.language_bytes]}
 
 
 def reviews_at(snapshot: date) -> dict[int, list[AddonReview]]:
@@ -239,7 +253,7 @@ def github(user: str, repo: str, *, stars: int = 0, last_commit: str | None = "2
         "user": user, "repo": repo, "repo_source": repo_source, "languages": languages or ["Python"], "stars": stars,
         "last_commit": last_commit,
         "links": [{"url": f"https://github.com/{user}/{repo}", "user": user, "repo": repo}],
-        "action_count": actions, "tests_count": tests, "license": license, "forks": 1, "open_issues": 2,
+        "action_count": actions, "tests_count": tests, "license": license, "fork_count": 1, "open_issues": 2,
         "size_kb": 100, "topics": topics or [], "repo_description": f"{repo} repository", "homepage": None,
         "archived": archived, "pushed_at": last_commit, "created_at": "2020-01-01T00:00:00",
         "primary_language": (languages or ["Python"])[0],

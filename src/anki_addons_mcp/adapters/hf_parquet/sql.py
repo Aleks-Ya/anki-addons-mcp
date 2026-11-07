@@ -11,7 +11,8 @@ _ISO_TIMESTAMP = "VARCHAR, ISO timestamp"
 _UNTRACKED = "; NULL in snapshots before 2026-11-01 and when GitHub gave no answer"
 # Explicit types: these fields are null-typed in snapshots before 2026-11-01, and SQL over them must bind on every one.
 _PACKAGE_TYPE = ("STRUCT(file_name VARCHAR, updated VARCHAR, size_bytes BIGINT, file_count BIGINT, "
-                 "uncompressed_bytes BIGINT, python_file_count BIGINT, python_lines BIGINT)")
+                 "uncompressed_bytes BIGINT, python_file_count BIGINT, python_lines BIGINT, primary_language VARCHAR, "
+                 "language_bytes STRUCT(name VARCHAR, bytes BIGINT)[])")
 _RELEASES_TYPE = ("STRUCT(tag_name VARCHAR, name VARCHAR, published_at VARCHAR, prerelease BOOLEAN, "
                   "assets STRUCT(name VARCHAR, size BIGINT, download_count BIGINT)[])[]")
 _CONTRIBUTORS_TYPE = "STRUCT(login VARCHAR, contributions BIGINT)[]"
@@ -62,6 +63,7 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("forks", "forks", "BIGINT[], addons forked from this one (the reverse of forked_from)"),
     ("package", f"TRY_CAST(package AS {_PACKAGE_TYPE})",
      (f"{_PACKAGE_TYPE}, the .ankiaddon package of the branch with the highest min_point_version (see `packages`); "
+      "primary_language is the language with the most bytes, ignoring data formats such as json or yaml; "
       "NULL when the snapshot holds no package of the addon, always in snapshots before 2026-11-01")),
     ("has_github", "github IS NOT NULL", "BOOLEAN"),
     ("github_user", "github.user", "VARCHAR"),
@@ -77,7 +79,7 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("github_action_count", "github.action_count", "BIGINT, GitHub Actions workflows"),
     ("github_tests_count", "github.tests_count", "BIGINT, test files"),
     ("github_license", "github.license", "VARCHAR, SPDX id"),
-    ("github_forks", "github.forks", "BIGINT, number of GitHub forks of the repo"),
+    ("github_fork_count", "github.fork_count", "BIGINT, GitHub fork count of the repo; unrelated to forks/forked_from"),
     ("github_open_issues", "github.open_issues",
      "BIGINT, open issues and open pull requests together; see github_open_issue_count, github_open_pr_count"),
     ("github_size_kb", "github.size_kb", "BIGINT"),
@@ -143,7 +145,8 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("forum_posts_count", "TRY_CAST(forum.posts_count AS BIGINT)", "BIGINT"),
     ("forum_topic_source", "forum.topic_source",
      ("VARCHAR, how the topic was found: 'override', 'contact_author', 'ai' (a description link an LLM confirmed "
-      "as the addon's own topic), 'most_linked' (an unverified description link)")),
+      "as the addon's own topic), 'most_linked' (an unverified description link), 'title_match' (a forum Add-ons "
+      "topic the page doesn't link, matched by title and confirmed by an LLM)")),
     ("ai_summary", "ai.summary", "VARCHAR, LLM-generated summary (may be inaccurate)"),
     ("ai_model", "ai.model", "VARCHAR, model that wrote ai_summary"),
     ("ai_tags", "ai.tags", "VARCHAR[], LLM-picked tags (may be inaccurate), names from the `tags` table"),
@@ -190,6 +193,7 @@ PACKAGE_COLUMNS: list[tuple[str, str]] = [
     ("python_file_count", "BIGINT"),
     ("python_lines", "BIGINT, lines of .py files up to 5 MB, comments and blank lines included"),
     ("files", "VARCHAR[], the paths in the package"),
+    ("language_bytes", "STRUCT(name, bytes)[], bytes per detected language, most first"),
 ]
 _DENIED_FUNCTIONS = frozenset({"getenv", "current_setting"})
 

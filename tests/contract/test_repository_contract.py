@@ -161,6 +161,8 @@ def test_package_summary_is_the_newest_branch(repository: AddonRepository) -> No
     newest = LATEST_PACKAGES[KANJI][-1]
     assert (kanji.package.file_name, kanji.package.size_bytes) == (newest.file_name, newest.size_bytes)
     assert kanji.package.updated == "2026-09-20"
+    assert kanji.package.primary_language == "python"
+    assert kanji.package.language_bytes == newest.language_bytes
     assert no_package.package is None
     assert no_package.anki_web.package_size_kb == 10
     without_size = repository.get_addon(NO_GITHUB)
@@ -310,6 +312,7 @@ def test_find_text_no_match(repository: AddonRepository) -> None:
     (AddonFilters(has_tests=True), {KANJI, OCCLUSION}),
     (AddonFilters(has_forum=True), {KANJI, OCCLUSION}),
     (AddonFilters(language="javascript"), {OCCLUSION}),
+    (AddonFilters(language="HANDLEBARS"), {KANJI}),
     (AddonFilters(description_language="DE"), {NO_GITHUB}),
     (AddonFilters(github_user="alice"), {KANJI, SAME_AUTHOR}),
     (AddonFilters(author_id=KANJI), set(ALICE_ADDONS)),
@@ -432,6 +435,7 @@ def test_group_counts(repository: AddonRepository) -> None:
     assert repository.group_counts(GroupField.UPDATE_YEAR)["2026"] == 5
     assert repository.group_counts(GroupField.ANKI_VERSION)[NONE_GROUP] == 1
     assert repository.group_counts(GroupField.ANKI_VERSION_KIND) == {"tested": 6, "hard": 1, "unknown": 1}
+    assert repository.group_counts(GroupField.PACKAGE_LANGUAGE) == {"python": 2, NONE_GROUP: 6}
 
 
 def test_documentation(repository: AddonRepository) -> None:

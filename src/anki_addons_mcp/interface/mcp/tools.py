@@ -47,7 +47,9 @@ Tags = Annotated[list[str] | None, Field(
                 "see list_tags for the vocabulary")]
 ExcludeTags = Annotated[list[str] | None, Field(
     description="AI tags the addon must not have, e.g. ['obsolete', 'no-description', 'paid']")]
-Language = Annotated[str | None, Field(description="GitHub language, e.g. Python, JavaScript")]
+Language = Annotated[str | None, Field(
+    description="Language of the GitHub repo or detected in the AnkiWeb package, case-insensitive, e.g. python, "
+                "javascript")]
 DescriptionLanguage = Annotated[str | None, Field(description="ISO code of the description")]
 AnkiVersionKind = Annotated[VersionKind | None, Field(
     description="Meaning of the addon's newest supported Anki version: hard (Anki disables it on newer "
@@ -126,7 +128,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
     @mcp.tool(annotations=READ_ONLY, description=(
         "Full record of one addon: AnkiWeb info and version branches, GitHub repository data, activity (commits, "
         "contributors, issues, pull requests, releases) and manifest, Anki Forum topic (topic_source says how it was "
-        "found), the newest package's sizes, AI summary and tags, and fork relations (forked_from, forks). Long texts, "
+        "found), the newest package's sizes and languages, AI summary and tags, and fork relations (forked_from, forks). Long texts, "
         "link lists and the GitHub release list are omitted unless requested in 'include'; github.release_count tells "
         "whether there are releases."))
     def get_addon(addon_id: AddonId, include: list[AddonInclude] | None = None,
@@ -169,7 +171,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "The .ankiaddon packages AnkiWeb serves for an addon, one per branch, by minimum Anki version: file name, "
-        "date, size, file and Python line counts (bundled libraries included) and download URL. 'include' adds the "
+        "date, size, file and Python line counts (bundled libraries included), bytes per detected language and "
+        "download URL. 'include' adds the "
         "raw manifest.json and config.json and the list of files. Use it to see what an addon really ships. Empty "
         "for snapshots before 2026-11-01, when packages were not collected. The files stay under their authors' "
         "licenses, not the dataset's CC0."))
@@ -267,7 +270,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
     @mcp.tool(annotations=READ_ONLY, description=(
         "Dataset statistics: addon counts (total, with GitHub, with forum topic, with tests), the number of "
         "AnkiWeb authors, and optional "
-        "group-by counts, e.g. by license, primary language, AI tag (ai_tag) or Anki version kind "
+        "group-by counts, e.g. by license, language (primary_language of the GitHub repo, or package_language "
+        "detected in the AnkiWeb package, which covers far more addons), AI tag (ai_tag) or Anki version kind "
         "(anki_version_kind)."))
     def get_statistics(group_by: list[GroupField] | None = None,
                        top_values: Annotated[int, Field(ge=1, le=200)] = 20,

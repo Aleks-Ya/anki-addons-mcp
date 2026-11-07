@@ -72,7 +72,7 @@ def register_resources(mcp: MCPServer, services: Services) -> None:
     catalog = services.catalog
 
     @mcp.resource("anki-addons://dataset/readme", mime_type="text/markdown",
-                  description="Dataset card: sources, field meanings, AI-summary disclaimer, license")
+                  description="Dataset card: overview, tables, links to the field docs, license")
     def dataset_readme() -> str:
         return services.repository.get_documentation()
 

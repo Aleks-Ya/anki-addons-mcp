@@ -148,7 +148,8 @@ class GithubInfo(BaseModel):
     action_count: int | None = None
     tests_count: int | None = None
     license: str | None = None
-    forks: int | None = None
+    fork_count: int | None = Field(default=None, description="GitHub fork count of the repo; unrelated to forks and "
+                                                             "forked_from")
     open_issues: int | None = Field(
         default=None, description="Open issues and open pull requests together; open_issue_count and open_pr_count "
                                   "separate them")
@@ -223,7 +224,9 @@ class ForumInfo(BaseModel):
     topic_source: str | None = Field(
         default=None, description="How the topic was found: 'override' (set by hand), 'contact_author' (the "
                                   "AnkiWeb Contact Author link), 'ai' (a description link an LLM confirmed as the "
-                                  "addon's own topic) or 'most_linked' (an unverified description link)")
+                                  "addon's own topic), 'most_linked' (an unverified description link) or "
+                                  "'title_match' (a forum Add-ons topic the page doesn't link, matched by title and "
+                                  "confirmed by an LLM)")
 
 
 class AiInfo(BaseModel):
@@ -250,6 +253,10 @@ class PackageSummary(BaseModel):
     python_file_count: int | None = None
     python_lines: int | None = Field(
         default=None, description="Lines of .py files up to 5 MB, comments and blank lines included")
+    primary_language: str | None = Field(
+        default=None, description="The language with the most bytes, ignoring data formats such as json or yaml")
+    language_bytes: list[LanguageBytes] = Field(
+        default_factory=list, description="Bytes per language detected in the package, most first")
 
 
 class AddonPackage(BaseModel):
@@ -268,6 +275,8 @@ class AddonPackage(BaseModel):
         default=None, description="Lines of .py files up to 5 MB, comments and blank lines included")
     files: list[str] = Field(default_factory=list, description="Paths in the package, if requested; compare "
                                                                "with file_count to see whether the list was cut")
+    language_bytes: list[LanguageBytes] = Field(
+        default_factory=list, description="Bytes per language detected in the package, most first")
     download_url: str | None = Field(
         default=None, description="Where the .ankiaddon file can be downloaded; null when the server reads a local "
                                   "dataset. The file stays under its author's license, not the dataset's CC0")
@@ -437,6 +446,7 @@ class TextKind(StrEnum):
 class GroupField(StrEnum):
     LICENSE = "license"
     PRIMARY_LANGUAGE = "primary_language"
+    PACKAGE_LANGUAGE = "package_language"
     DESCRIPTION_LANGUAGE = "description_language"
     ANKI_VERSION = "anki_version"
     ANKI_VERSION_KIND = "anki_version_kind"

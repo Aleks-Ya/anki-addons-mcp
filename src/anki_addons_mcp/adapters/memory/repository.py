@@ -79,10 +79,6 @@ def _github_checks(gh: GithubInfo | None, f: AddonFilters) -> list[bool]:
         checks.append((gh is not None) == f.has_github)
     if f.has_tests is not None:
         checks.append(bool(gh and gh.tests_count) == f.has_tests)
-    if f.language is not None:
-        language = f.language.lower()
-        checks.append(gh is not None and (language in [x.lower() for x in gh.languages]
-                                          or _lower(gh.primary_language) == language))
     if f.github_user is not None:
         checks.append(gh is not None and _lower(gh.user) == f.github_user.lower())
     if f.archived is not None:
@@ -90,6 +86,17 @@ def _github_checks(gh: GithubInfo | None, f: AddonFilters) -> list[bool]:
     if f.has_ai_tooling is not None:
         checks.append(bool(gh and gh.ai_tooling_markers) == f.has_ai_tooling)
     return checks
+
+
+def _language_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
+    if f.language is None:
+        return []
+    language = f.language.lower()
+    gh = d.github
+    in_github = gh is not None and (language in [x.lower() for x in gh.languages]
+                                    or _lower(gh.primary_language) == language)
+    in_package = d.package is not None and language in [lb.name.lower() for lb in d.package.language_bytes]
+    return [in_github or in_package]
 
 
 def _version_checks(aw: AnkiWebInfo, f: AddonFilters) -> list[bool]:
@@ -115,7 +122,7 @@ def _tag_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
 
 
 def _matches(d: AddonDetails, f: AddonFilters) -> bool:
-    return all(_anki_web_checks(d, f) + _fork_checks(d, f) + _github_checks(d.github, f)
+    return all(_anki_web_checks(d, f) + _fork_checks(d, f) + _github_checks(d.github, f) + _language_checks(d, f)
                + _version_checks(d.anki_web, f) + _tag_checks(d, f))
 
 
@@ -155,6 +162,7 @@ def _sort_value(d: AddonDetails, field: SortField, score: float | None) -> Any:
 _GROUP_VALUES: dict[GroupField, Callable[[AddonDetails], list[str | None]]] = {
     GroupField.LICENSE: lambda d: [d.github.license if d.github else None],
     GroupField.PRIMARY_LANGUAGE: lambda d: [d.github.primary_language if d.github else None],
+    GroupField.PACKAGE_LANGUAGE: lambda d: [d.package.primary_language if d.package else None],
     GroupField.DESCRIPTION_LANGUAGE: lambda d: [d.anki_web.description_language],
     GroupField.ANKI_VERSION: lambda d: [d.anki_web.anki_version],
     GroupField.ANKI_VERSION_KIND: lambda d: [d.anki_web.anki_version_kind.value],

@@ -87,7 +87,7 @@ def _github(row: dict[str, Any]) -> GithubInfo:
         action_count=row["github_action_count"],
         tests_count=row["github_tests_count"],
         license=row["github_license"],
-        forks=row["github_forks"],
+        fork_count=row["github_fork_count"],
         open_issues=row["github_open_issues"],
         size_kb=row["github_size_kb"],
         topics=_list(row["github_topics"]),
