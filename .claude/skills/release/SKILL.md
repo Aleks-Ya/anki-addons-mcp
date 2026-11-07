@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # release
 
-Automate README-DEV.md → "Release a new version" → **steps 2–8** (bump, push, GitHub release,
+Automate docs/maintaining.md → "Release a new version" → **steps 2–8** (bump, push, GitHub release,
 publish, verify). It is the natural follow-on to `/push` (README step 1), which should have left `main`
 pushed with green CI and a clean SonarCloud report.
 

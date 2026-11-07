@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # deploy
 
-Deploy a version to the HuggingFace Space (README-DEV.md → "Deploy to a HuggingFace Space") and verify that
+Deploy a version to the HuggingFace Space (docs/maintaining.md → "Deploy to a HuggingFace Space") and verify that
 the Space runs it. The skill suggests two candidates, the latest release and the local `main`, shows whether each
 is on GitHub and passed CI, and asks which one to deploy. It only moves the Space forward (never a rollback, never
 a force-push), and does not commit or fix code itself. Work through the steps in order; stop and report if a step
@@ -26,7 +26,7 @@ git fetch -q --tags origin
 ```
 
 Confirm the remote `space` exists (`git remote get-url space`). If it is missing, stop and point the user to
-the setup in README-DEV.md (`git remote add space https://huggingface.co/spaces/Ya-Alex/anki-addons-mcp`).
+the setup in docs/maintaining.md (`git remote add space https://huggingface.co/spaces/Ya-Alex/anki-addons-mcp`).
 
 Only committed code is deployed, so uncommitted changes (`git status --porcelain`) don't block the deploy;
 mention them in the report.
@@ -115,7 +115,7 @@ It is a fast-forward: step 2b only keeps commits ahead of `space/main`.
 
 Git authenticates to huggingface.co with the HF token stored in its credential helper. If the push fails with
 an authentication error (e.g. `could not read Username for 'https://huggingface.co'`), stop and point the user
-to the one-time setup in README-DEV.md → "Deploy to a HuggingFace Space". If the push is rejected for any other
+to the one-time setup in docs/maintaining.md → "Deploy to a HuggingFace Space". If the push is rejected for any other
 reason, stop and report.
 
 ## 5. Wait for the Space to build and start
