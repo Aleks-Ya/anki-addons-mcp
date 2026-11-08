@@ -48,8 +48,8 @@ Tags = Annotated[list[str] | None, Field(
 ExcludeTags = Annotated[list[str] | None, Field(
     description="AI tags the addon must not have, e.g. ['obsolete', 'no-description', 'paid']")]
 Language = Annotated[str | None, Field(
-    description="Language of the GitHub repo or detected in the AnkiWeb package, case-insensitive, e.g. python, "
-                "javascript")]
+    description="Language of the GitHub repo or detected in the AnkiWeb package, case-insensitive, e.g. Python, "
+                "JavaScript")]
 DescriptionLanguage = Annotated[str | None, Field(description="ISO code of the description")]
 AnkiVersionKind = Annotated[VersionKind | None, Field(
     description="Meaning of the addon's newest supported Anki version: hard (Anki disables it on newer "

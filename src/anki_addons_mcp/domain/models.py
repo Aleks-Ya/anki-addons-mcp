@@ -254,9 +254,10 @@ class PackageSummary(BaseModel):
     python_lines: int | None = Field(
         default=None, description="Lines of .py files up to 5 MB, comments and blank lines included")
     primary_language: str | None = Field(
-        default=None, description="The language with the most bytes, ignoring data formats such as json or yaml")
+        default=None, description="The language with the most bytes, ignoring data formats such as JSON, CSV or YAML")
     language_bytes: list[LanguageBytes] = Field(
-        default_factory=list, description="Bytes per language detected in the package, most first")
+        default_factory=list, description="Bytes per language detected in the package, most first; "
+                                          "GitHub Linguist names such as Python")
 
 
 class AddonPackage(BaseModel):
@@ -276,7 +277,8 @@ class AddonPackage(BaseModel):
     files: list[str] = Field(default_factory=list, description="Paths in the package, if requested; compare "
                                                                "with file_count to see whether the list was cut")
     language_bytes: list[LanguageBytes] = Field(
-        default_factory=list, description="Bytes per language detected in the package, most first")
+        default_factory=list, description="Bytes per language detected in the package, most first; "
+                                          "GitHub Linguist names such as Python")
     download_url: str | None = Field(
         default=None, description="Where the .ankiaddon file can be downloaded; null when the server reads a local "
                                   "dataset. The file stays under its author's license, not the dataset's CC0")

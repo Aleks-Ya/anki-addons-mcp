@@ -70,7 +70,7 @@ schemas.
 |---|---|
 | `min_rating`, `min_likes`, `min_stars` | with at least this many AnkiWeb votes, likes or GitHub stars |
 | `has_github`, `has_tests`, `has_forum` | with a GitHub repo, tests or an Anki Forum topic |
-| `language` | whose GitHub repo language or a language detected in the package matches, e.g. `python` |
+| `language` | whose GitHub repo language or a language detected in the package matches, case-insensitive, e.g. `Python` |
 | `description_language` | whose description is in this language (ISO code) |
 | `compatible_with_anki` | that support this Anki version |
 | `anki_version_kind`, `anki_version_at_least` | by the newest supported Anki version: its [kind](#anki-versions) or a minimum |

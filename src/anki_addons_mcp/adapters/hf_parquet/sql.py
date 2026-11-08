@@ -63,7 +63,8 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("forks", "forks", "BIGINT[], addons forked from this one (the reverse of forked_from)"),
     ("package", f"TRY_CAST(package AS {_PACKAGE_TYPE})",
      (f"{_PACKAGE_TYPE}, the .ankiaddon package of the branch with the highest min_point_version (see `packages`); "
-      "primary_language is the language with the most bytes, ignoring data formats such as json or yaml; "
+      "primary_language is the language with the most bytes, ignoring data formats such as JSON, CSV or YAML; "
+      "language names are GitHub Linguist names such as 'Python', as in github_primary_language; "
       "NULL when the snapshot holds no package of the addon, always in snapshots before 2026-11-01")),
     ("has_github", "github IS NOT NULL", "BOOLEAN"),
     ("github_user", "github.user", "VARCHAR"),
@@ -193,7 +194,7 @@ PACKAGE_COLUMNS: list[tuple[str, str]] = [
     ("python_file_count", "BIGINT"),
     ("python_lines", "BIGINT, lines of .py files up to 5 MB, comments and blank lines included"),
     ("files", "VARCHAR[], the paths in the package"),
-    ("language_bytes", "STRUCT(name, bytes)[], bytes per detected language, most first"),
+    ("language_bytes", "STRUCT(name, bytes)[], bytes per detected language, most first; Linguist names, e.g. 'Python'"),
 ]
 _DENIED_FUNCTIONS = frozenset({"getenv", "current_setting"})
 

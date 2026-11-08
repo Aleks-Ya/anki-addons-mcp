@@ -101,7 +101,8 @@ def test_dataset_4_1_columns(duckdb_repository: DuckDbAddonRepository, snapshot:
     assert result.rows == [expected]
 
 
-# Dataset 4.2.0 renamed github.forks and added package languages; package is null-typed in OLD.
+# Dataset 4.2.0 renamed github.forks and added package languages (Linguist names since 4.2.1); package is
+# null-typed in OLD.
 @pytest.mark.parametrize(("snapshot", "expected"), [(None, [7, 2, 1, 3]), (OLD, [6, 0, 0, 0])])
 def test_dataset_4_2_columns(duckdb_repository: DuckDbAddonRepository, snapshot: date | None,
                              expected: list[object]) -> None:
@@ -109,7 +110,7 @@ def test_dataset_4_2_columns(duckdb_repository: DuckDbAddonRepository, snapshot:
         "SELECT (SELECT sum(github_fork_count) FROM addons), "
         "(SELECT count(package.primary_language) FROM addons), "
         "(SELECT count(*) FROM addons WHERE list_contains(list_transform(package.language_bytes, lambda x: x.name), "
-        "'handlebars')), "
+        "'Handlebars')), "
         "(SELECT count(*) FROM packages WHERE len(language_bytes) > 0)", snapshot, 10, 5)
     assert result.rows == [expected]
 
