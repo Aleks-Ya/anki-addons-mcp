@@ -9,10 +9,10 @@ directory. CLI flags override environment variables; `uvx anki-addons-mcp --help
 | `ANKI_MCP_HOST` / `ANKI_MCP_PORT` / `ANKI_MCP_PATH` | `--host` / `--port` / `--path` | `127.0.0.1` / `8000` / `/mcp` | HTTP binding |
 | `ANKI_MCP_ALLOWED_HOSTS` | | `[]` | JSON list of Host headers to allow (enables DNS-rebinding protection) |
 | `ANKI_MCP_BACKEND` | `--backend` | `hf_parquet` | `hf_parquet` (HuggingFace Hub) or `local_parquet` (a local copy) |
-| `ANKI_MCP_HF_REPO_ID` / `ANKI_MCP_HF_REVISION` | `--hf-revision` | `Ya-Alex/anki-addons` / `main` | Dataset to serve |
+| `ANKI_MCP_HF_REPO_ID` / `ANKI_MCP_HF_REVISION` | `--hf-revision` | `Ya-Alex/anki-addons` / `v1.0-2026-11-01` | Dataset to serve; the revision is any git ref: a version tag, the `v1` or `main` branch, a commit SHA (see [Update the dataset version](maintaining.md#update-the-dataset-version)) |
 | `ANKI_MCP_DATA_DIR` | `--data-dir` | | Dataset directory for `local_parquet` (`latest/`, `history/<date>/`) |
 | `ANKI_MCP_CACHE_DIR` | `--cache-dir` | HF cache | Download cache |
-| `ANKI_MCP_REFRESH_INTERVAL_SECONDS` | `--refresh-interval` | `3600` | Check for a new dataset revision; `0` disables |
+| `ANKI_MCP_REFRESH_INTERVAL_SECONDS` | `--refresh-interval` | `3600` | Check for a new dataset revision; finds one only when the revision is a branch, the default tag never changes; `0` disables |
 | `ANKI_MCP_SQL_ENABLED` / `_SQL_MAX_ROWS` / `_SQL_TIMEOUT_SECONDS` | `--no-sql` | `true` / `200` / `10` | `query_sql` limits |
 | `ANKI_MCP_MAINTENANCE_ACTIVE_DAYS` / `_STALE_DAYS` | | `180` / `730` | Maintenance label thresholds |
 | `ANKI_MCP_LOG_LEVEL` | `--log-level` | `INFO` | Logs go to stderr |

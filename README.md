@@ -41,8 +41,8 @@ Other MCP clients use the same command (`uvx anki-addons-mcp`) in their server c
 }
 ```
 
-The first start downloads the latest snapshot (~20 MB) into the HuggingFace cache. Older snapshots are
-downloaded on demand by history tools, so the first history question can take a minute.
+The first start downloads the latest snapshot of the pinned dataset version (~20 MB) into the HuggingFace
+cache. Older snapshots are downloaded on demand by history tools, so the first history question can take a minute.
 
 ## Use it remotely (Streamable HTTP)
 

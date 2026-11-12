@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     backend: Literal["hf_parquet", "local_parquet"] = "hf_parquet"
     hf_repo_id: str = "Ya-Alex/anki-addons"
-    hf_revision: str = "main"
+    hf_revision: str = "v1.0-2026-11-01"
     hf_token: str | None = None
     data_dir: Path | None = None
     cache_dir: Path | None = None

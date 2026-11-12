@@ -1,6 +1,6 @@
 # Maintainer guide
 
-Deploying, releasing and CI. For running and testing the code, see the [Developer guide](development.md).
+Deploying, releasing, updating the dataset version and CI. For running and testing the code, see the [Developer guide](development.md).
 
 ## Deploy to a HuggingFace Space
 
@@ -27,6 +27,39 @@ Step 3 for an existing Space is automated by the skill `/deploy`: it suggests th
 (those ahead of the Space, with whether they are on GitHub and passed CI), deploys the chosen one (running the
 tests locally first when it has no green CI), waits for the rebuild and smoke-tests the endpoint. It only moves
 the Space forward and never force-pushes.
+
+## Update the dataset version
+
+The server reads the dataset at a frozen revision: the default of `hf_revision` in
+`src/anki_addons_mcp/config.py`. The dataset publishes these refs (its
+[versioning](https://github.com/Aleks-Ya/anki-addons-dataset/blob/main/docs/dataset/versioning.md) and
+[changelog](https://github.com/Aleks-Ya/anki-addons-dataset/blob/main/docs/dataset/changelog.md)):
+
+| Revision | Gets |
+|---|---|
+| `vMAJOR.MINOR-<date>` tag, e.g. `v1.0-2026-11-01` | never changes |
+| `v1` branch | every new snapshot, never a breaking change |
+| `main` branch | every new snapshot and every change, including breaking |
+
+The default is a tag, so the data is reproducible and no schema change reaches the server untested. The cost is
+that the hourly refresh finds nothing new: a new snapshot reaches users only with a new release of the server.
+
+1. List the version tags (ignore the `backup-*` tags):
+   ```bash
+   uv run python -c "from huggingface_hub import HfApi; print([t.name for t in HfApi().list_repo_refs('Ya-Alex/anki-addons', repo_type='dataset').tags if t.name.startswith('v')])"
+   ```
+   `list_repo_refs` shows the annotated tag object as a tag's target, not the commit; the commit the server
+   loads is `HfApi().dataset_info('Ya-Alex/anki-addons', revision='<tag>').sha`.
+2. Read the dataset changelog since the current tag and adapt the code to schema changes. A MAJOR bump means a
+   column was removed or renamed.
+3. Set the new tag in `hf_revision` (`src/anki_addons_mcp/config.py`) and in the `ANKI_MCP_HF_REVISION` default
+   in [Configuration](configuration.md).
+4. Run the tests, then start the server against the new tag and check that the log shows its commit and that
+   `list_snapshots` lists the new snapshot:
+   ```bash
+   uv run anki-addons-mcp --transport http --port 8000
+   ```
+5. [Release a new version](#release-a-new-version) and [deploy](#deploy-to-a-huggingface-space) it.
 
 ## Release a new version
 

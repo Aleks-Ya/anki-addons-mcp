@@ -168,7 +168,7 @@ class LocalDatasetSource(_BaseSource):
 
 
 class HfDatasetSource(_BaseSource):
-    def __init__(self, repo_id: str, revision: str = "main", cache_dir: Path | None = None,
+    def __init__(self, repo_id: str, revision: str, cache_dir: Path | None = None,
                  token: str | None = None):
         from huggingface_hub import HfApi
 
