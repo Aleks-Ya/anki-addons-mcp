@@ -131,6 +131,19 @@ def _github(row: dict[str, Any]) -> GithubInfo:
     )
 
 
+def _forum(row: dict[str, Any]) -> ForumInfo | None:
+    if not row["has_forum"] and row["forum_topic_id"] is None:
+        return None
+    return ForumInfo(
+        anki_forum_url=row["forum_url"],
+        topic_slug=row["forum_topic_slug"],
+        topic_id=row["forum_topic_id"],
+        last_posted_at=row["forum_last_posted_at"],
+        posts_count=row["forum_posts_count"],
+        topic_source=row["forum_topic_source"],
+    )
+
+
 def row_to_details(row: dict[str, Any]) -> AddonDetails:
     anki_web = AnkiWebInfo(
         title=row["title"] or "",
@@ -153,22 +166,12 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
         package_size_kb=row["package_size_kb"],
     )
     github = _github(row) if row["has_github"] else None
-    forum = None
-    if row["has_forum"] or row["forum_topic_id"] is not None:
-        forum = ForumInfo(
-            anki_forum_url=row["forum_url"],
-            topic_slug=row["forum_topic_slug"],
-            topic_id=row["forum_topic_id"],
-            last_posted_at=row["forum_last_posted_at"],
-            posts_count=row["forum_posts_count"],
-            topic_source=row["forum_topic_source"],
-        )
     tags = _list(row["ai_tags"])
     has_ai = row["ai_summary"] or row["ai_model"] or tags
     ai = AiInfo(summary=row["ai_summary"], model=row["ai_model"], tags=tags) if has_ai else None
     forked_from = ForkRelation.model_validate(row["forked_from"]) if row["forked_from"] else None
     duplicate_of = DuplicateRelation.model_validate(row["duplicate_of"]) if row["duplicate_of"] else None
     package = PackageSummary.model_validate(row["package"]) if row["package"] else None
-    return AddonDetails(id=row["id"], anki_web=anki_web, github=github, forum=forum, ai=ai, author=_author(row),
+    return AddonDetails(id=row["id"], anki_web=anki_web, github=github, forum=_forum(row), ai=ai, author=_author(row),
                         forked_from=forked_from, forks=_list(row["forks"]), duplicate_of=duplicate_of,
                         duplicates=_list(row["duplicates"]), package=package)

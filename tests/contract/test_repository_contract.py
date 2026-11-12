@@ -275,17 +275,20 @@ def test_duplicates_in_details_and_cards(repository: AddonRepository) -> None:
 
 def test_shared_repo_and_manifest_path_in_details(repository: AddonRepository) -> None:
     kanji = repository.get_addon(KANJI)
-    assert kanji is not None and kanji.github is not None
+    assert kanji is not None
+    assert kanji.github is not None
     assert (kanji.github.shared_with, kanji.github.repo_sharing) == ([SAME_AUTHOR], RepoSharing.SAME_AUTHOR)
     assert kanji.github.manifest_path == "manifest.json"
     heatmap = repository.get_addon(HEATMAP)
-    assert heatmap is not None and heatmap.github is not None
+    assert heatmap is not None
+    assert heatmap.github is not None
     assert (heatmap.github.shared_with, heatmap.github.repo_sharing, heatmap.github.manifest_path) == ([], None, None)
 
 
 def test_duplicates_and_sharing_in_old_snapshot(repository: AddonRepository) -> None:
     kanji = repository.get_addon(KANJI, OLD)
-    assert kanji is not None and kanji.github is not None
+    assert kanji is not None
+    assert kanji.github is not None
     assert (kanji.duplicates, kanji.github.shared_with, kanji.github.repo_sharing) == ([], [SAME_AUTHOR], None)
     assert kanji.github.manifest_path == "manifest.json"
     assert ids(repository, AddonQuery(filters=AddonFilters(is_duplicate=True)), OLD) == []

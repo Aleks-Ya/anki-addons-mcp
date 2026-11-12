@@ -33,6 +33,31 @@ def _terms(details: AddonDetails) -> list[str]:
     return list(seen)[:_MAX_TERMS]
 
 
+def _relations(target: AddonDetails) -> dict[int, list[tuple[str, float]]]:
+    """Forks, copies and addons of the same repo, with a reason and a weight each."""
+    related: dict[int, list[tuple[str, float]]] = {}
+
+    def relate(addon_id: int, reason: str, weight: float) -> None:
+        if addon_id != target.id:
+            related.setdefault(addon_id, []).append((reason, weight))
+
+    for fork in target.forks:
+        relate(fork, "forked from this addon", 1.0)
+    if target.forked_from is not None:
+        relate(target.forked_from.id, f"this addon is a fork of it ({target.forked_from.evidence} evidence)", 1.0)
+    for copy in target.duplicates:
+        relate(copy, "identical package: a copy of this addon", 1.0)
+    if target.duplicate_of is not None:
+        relate(target.duplicate_of.id,
+               f"identical package: this addon is a copy of it ({target.duplicate_of.evidence} evidence)", 1.0)
+    github = target.github
+    if github is not None:
+        sharing = f" ({github.repo_sharing})" if github.repo_sharing else ""
+        for addon_id in github.shared_with:
+            relate(addon_id, f"shares the GitHub repo{sharing}", 0.5)
+    return related
+
+
 def _unvoted(card: AddonCard) -> bool:
     return card.likes + card.dislikes == 0
 
@@ -87,27 +112,8 @@ class SimilarityService:
             entry.reasons.append(reason)
 
     def _add_relations(self, target: AddonDetails, scored: dict[int, SimilarAddon], snapshot: date | None) -> None:
-        """Forks, copies and addons of the same repo: linked to the target whatever their wording."""
-        related: dict[int, list[tuple[str, float]]] = {}
-
-        def relate(addon_id: int, reason: str, weight: float) -> None:
-            if addon_id != target.id:
-                related.setdefault(addon_id, []).append((reason, weight))
-
-        for fork in target.forks:
-            relate(fork, "forked from this addon", 1.0)
-        if target.forked_from is not None:
-            relate(target.forked_from.id, f"this addon is a fork of it ({target.forked_from.evidence} evidence)", 1.0)
-        for copy in target.duplicates:
-            relate(copy, "identical package: a copy of this addon", 1.0)
-        if target.duplicate_of is not None:
-            relate(target.duplicate_of.id,
-                   f"identical package: this addon is a copy of it ({target.duplicate_of.evidence} evidence)", 1.0)
-        github = target.github
-        if github is not None:
-            sharing = f" ({github.repo_sharing})" if github.repo_sharing else ""
-            for addon_id in github.shared_with:
-                relate(addon_id, f"shares the GitHub repo{sharing}", 0.5)
+        """Related addons join the result whatever their wording."""
+        related = _relations(target)
         missing = [addon_id for addon_id in related if addon_id not in scored]
         if missing:
             cards = self._repository.find(
