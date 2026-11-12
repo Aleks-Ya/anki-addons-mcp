@@ -60,7 +60,7 @@ The Space sleeps after inactivity, so the first request can take a while. To hos
 ## What it can do
 
 - **Find addons**: full-text search and structured filters (rating, GitHub, language, Anki version, AI tags,
-  forks, ...), similar addons, addons of an author, leaderboards.
+  forks, copies, ...), similar addons, addons of an author, leaderboards.
 - **Inspect an addon**: the full record, GitHub README, AnkiWeb description, user reviews, and what its
   `.ankiaddon` packages really ship.
 - **Check compatibility** of addons with an Anki version, and list the real Anki releases.

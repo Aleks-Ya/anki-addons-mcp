@@ -61,6 +61,11 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
       "evidence 'github_fork', "
       "'ai' (LLM-detected, may be inaccurate) or 'override'; detection is incomplete")),
     ("forks", "forks", "BIGINT[], addons forked from this one (the reverse of forked_from)"),
+    ("duplicate_of", "duplicate_of",
+     ("STRUCT(id BIGINT, evidence VARCHAR), the addon this one is a copy of or NULL; evidence 'same_package' "
+      "(the newest packages are byte-identical; the best rated of a group is the original) or 'override'; "
+      "always NULL in snapshots before 2026-11-01, which have no packages")),
+    ("duplicates", "duplicates", "BIGINT[], copies of this addon (the reverse of duplicate_of)"),
     ("package", f"TRY_CAST(package AS {_PACKAGE_TYPE})",
      (f"{_PACKAGE_TYPE}, the .ankiaddon package of the branch with the highest min_point_version (see `packages`); "
       "primary_language is the language with the most bytes, ignoring data formats such as JSON, CSV or YAML; "
@@ -71,6 +76,12 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("github_repo", "github.repo", "VARCHAR"),
     ("github_repo_source", "github.repo_source",
      "VARCHAR, how the repo was matched: 'override', 'contact_author', 'self_reference', 'ai', 'most_linked'"),
+    ("github_shared_with", "github.shared_with",
+     ("BIGINT[], other addons with the same repo, empty when not shared; repo-level github_* columns repeat "
+      "across them: count each repo once before summing")),
+    ("github_repo_sharing", "github.repo_sharing",
+     ("VARCHAR, 'same_author' or 'cross_author' when the repo is shared; NULL otherwise or when an author is "
+      "unknown (always in snapshots before 2026-11-01)")),
     ("github_fork_source", "github.fork_source",
      "VARCHAR, root repo (owner/repo) of the GitHub fork network when the repo is a GitHub fork"),
     ("github_languages", "github.languages", "VARCHAR[]"),
@@ -93,8 +104,10 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("github_primary_language", "github.primary_language", "VARCHAR"),
     ("github_language_bytes", "github.language_bytes", "STRUCT(name, bytes)[]"),
     ("github_manifest", "CAST(to_json(github.manifest) AS VARCHAR)",
-     ("VARCHAR, JSON of the addon manifest.json; "
+     ("VARCHAR, JSON of the addon's own manifest.json in the repo, at github_manifest_path; NULL when a repo "
+      "of several addons has none clearly this addon's; "
       "min/max_point_version as written (negative max = hard), min/max_version and max_version_kind parsed")),
+    ("github_manifest_path", "github.manifest_path", "VARCHAR, path of the addon's manifest.json in the repo"),
     ("github_dependencies", "TRY_CAST(github.dependencies AS VARCHAR[])", "VARCHAR[], Python dependencies"),
     ("github_readme", "TRY_CAST(github.readme AS VARCHAR)", "VARCHAR, README text"),
     ("github_ai_tooling_markers", "github.ai_tooling_markers", "VARCHAR[], AI coding tool traces in the repo"),

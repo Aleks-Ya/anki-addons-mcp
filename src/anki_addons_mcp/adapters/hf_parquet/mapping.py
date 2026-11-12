@@ -11,6 +11,7 @@ from anki_addons_mcp.domain.models import (
     AnkiWebLink,
     AuthorInfo,
     Branch,
+    DuplicateRelation,
     ForkRelation,
     ForumInfo,
     GithubContributor,
@@ -28,7 +29,7 @@ CARD_COLUMNS = [
     "anki_version_kind", "ai_summary",
     "github_user", "github_repo", "github_stars", "github_last_commit", "github_archived", "github_license",
     "forum_posts_count", "ai_tags", "author_id",
-    "forked_from", "forks",
+    "forked_from", "forks", "duplicate_of", "duplicates",
 ]
 
 
@@ -65,7 +66,8 @@ def row_to_card(row: dict[str, Any], score: float | None = None) -> AddonCard:
         github_last_commit=row["github_last_commit"], github_archived=row["github_archived"],
         license=row["github_license"], forum_posts_count=row["forum_posts_count"], ai_tags=_list(row["ai_tags"]),
         author_id=row["author_id"], forked_from=row["forked_from"]["id"] if row["forked_from"] else None,
-        forks=_list(row["forks"]), score=score,
+        forks=_list(row["forks"]), duplicate_of=row["duplicate_of"]["id"] if row["duplicate_of"] else None,
+        duplicates=_list(row["duplicates"]), score=score,
     )
 
 
@@ -99,6 +101,9 @@ def _github(row: dict[str, Any]) -> GithubInfo:
         primary_language=row["github_primary_language"],
         language_bytes=[LanguageBytes.model_validate(lb) for lb in _structs(row["github_language_bytes"])],
         manifest=_manifest(row["github_manifest"]),
+        manifest_path=row["github_manifest_path"],
+        shared_with=_list(row["github_shared_with"]),
+        repo_sharing=row["github_repo_sharing"],
         dependencies=_list(row["github_dependencies"]),
         ai_tooling_markers=_list(row["github_ai_tooling_markers"]),
         fork_source=row["github_fork_source"],
@@ -162,6 +167,8 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
     has_ai = row["ai_summary"] or row["ai_model"] or tags
     ai = AiInfo(summary=row["ai_summary"], model=row["ai_model"], tags=tags) if has_ai else None
     forked_from = ForkRelation.model_validate(row["forked_from"]) if row["forked_from"] else None
+    duplicate_of = DuplicateRelation.model_validate(row["duplicate_of"]) if row["duplicate_of"] else None
     package = PackageSummary.model_validate(row["package"]) if row["package"] else None
     return AddonDetails(id=row["id"], anki_web=anki_web, github=github, forum=forum, ai=ai, author=_author(row),
-                        forked_from=forked_from, forks=_list(row["forks"]), package=package)
+                        forked_from=forked_from, forks=_list(row["forks"]), duplicate_of=duplicate_of,
+                        duplicates=_list(row["duplicates"]), package=package)

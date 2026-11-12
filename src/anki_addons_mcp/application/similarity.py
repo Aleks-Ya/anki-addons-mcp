@@ -48,7 +48,7 @@ class SimilarityService:
         target = self._catalog.get(addon_id, snapshot)
         scored = self._wording_matches(target, limit, snapshot)
         self._add_same_author(target, scored, limit, snapshot)
-        self._add_fork_relations(target, scored, snapshot)
+        self._add_relations(target, scored, snapshot)
         self._add_topic_overlap(target, scored, snapshot)
         self._add_tag_overlap(target, scored, snapshot)
         # Addons nobody has voted on yet are untested, so they go after every voted one.
@@ -86,22 +86,39 @@ class SimilarityService:
             entry.score += 0.5
             entry.reasons.append(reason)
 
-    def _add_fork_relations(self, target: AddonDetails, scored: dict[int, SimilarAddon],
-                            snapshot: date | None) -> None:
-        reasons = {fork: "forked from this addon" for fork in target.forks if fork != target.id}
-        parent = target.forked_from
-        if parent is not None and parent.id != target.id:
-            reasons[parent.id] = f"this addon is a fork of it ({parent.evidence} evidence)"
-        missing = [addon_id for addon_id in reasons if addon_id not in scored]
+    def _add_relations(self, target: AddonDetails, scored: dict[int, SimilarAddon], snapshot: date | None) -> None:
+        """Forks, copies and addons of the same repo: linked to the target whatever their wording."""
+        related: dict[int, list[tuple[str, float]]] = {}
+
+        def relate(addon_id: int, reason: str, weight: float) -> None:
+            if addon_id != target.id:
+                related.setdefault(addon_id, []).append((reason, weight))
+
+        for fork in target.forks:
+            relate(fork, "forked from this addon", 1.0)
+        if target.forked_from is not None:
+            relate(target.forked_from.id, f"this addon is a fork of it ({target.forked_from.evidence} evidence)", 1.0)
+        for copy in target.duplicates:
+            relate(copy, "identical package: a copy of this addon", 1.0)
+        if target.duplicate_of is not None:
+            relate(target.duplicate_of.id,
+                   f"identical package: this addon is a copy of it ({target.duplicate_of.evidence} evidence)", 1.0)
+        github = target.github
+        if github is not None:
+            sharing = f" ({github.repo_sharing})" if github.repo_sharing else ""
+            for addon_id in github.shared_with:
+                relate(addon_id, f"shares the GitHub repo{sharing}", 0.5)
+        missing = [addon_id for addon_id in related if addon_id not in scored]
         if missing:
             cards = self._repository.find(
                 AddonQuery(filters=AddonFilters(addon_ids=missing), limit=len(missing)), snapshot).items
             for card in cards:
                 scored[card.id] = SimilarAddon(card=card, score=0.0, reasons=[])
-        for addon_id, reason in reasons.items():
+        for addon_id, relations in related.items():
             if addon_id in scored:
-                scored[addon_id].score += 1.0
-                scored[addon_id].reasons.append(reason)
+                for reason, weight in relations:
+                    scored[addon_id].score += weight
+                    scored[addon_id].reasons.append(reason)
 
     def _add_topic_overlap(self, target: AddonDetails, scored: dict[int, SimilarAddon], snapshot: date | None) -> None:
         topics = set(target.github.topics) - {"anki", "anki-addon", "anki-add-on", "addon"} if target.github else set()

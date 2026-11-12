@@ -5,7 +5,16 @@ import pytest
 from anki_addons_mcp.adapters.hf_parquet.repository import DuckDbAddonRepository
 from anki_addons_mcp.adapters.memory.repository import InMemoryAddonRepository
 from anki_addons_mcp.domain.errors import InvalidQuery, SnapshotNotFound
-from anki_addons_mcp.domain.models import NONE_GROUP, ForkEvidence, GroupField, ReviewVote, TextKind, VersionKind
+from anki_addons_mcp.domain.models import (
+    NONE_GROUP,
+    DuplicateEvidence,
+    ForkEvidence,
+    GroupField,
+    RepoSharing,
+    ReviewVote,
+    TextKind,
+    VersionKind,
+)
 from anki_addons_mcp.domain.ports import AddonRepository
 from anki_addons_mcp.domain.query import AddonFilters, AddonQuery, ReviewQuery, SortField
 from tests.fixtures.dataset import (
@@ -254,6 +263,35 @@ def test_forks_in_old_snapshot(repository: AddonRepository) -> None:
     assert ids(repository, AddonQuery(filters=AddonFilters(fork_of=LEGACY)), OLD) == [VIBE]
 
 
+def test_duplicates_in_details_and_cards(repository: AddonRepository) -> None:
+    copy = repository.get_addon(NO_GITHUB)
+    assert copy is not None
+    assert copy.duplicate_of is not None
+    assert (copy.duplicate_of.id, copy.duplicate_of.evidence) == (KANJI, DuplicateEvidence.SAME_PACKAGE)
+    cards = {c.id: c for c in repository.find(AddonQuery(filters=AddonFilters(addon_ids=[KANJI, NO_GITHUB]))).items}
+    assert (cards[NO_GITHUB].duplicate_of, cards[NO_GITHUB].duplicates) == (KANJI, [])
+    assert (cards[KANJI].duplicate_of, cards[KANJI].duplicates) == (None, [NO_GITHUB])
+
+
+def test_shared_repo_and_manifest_path_in_details(repository: AddonRepository) -> None:
+    kanji = repository.get_addon(KANJI)
+    assert kanji is not None and kanji.github is not None
+    assert (kanji.github.shared_with, kanji.github.repo_sharing) == ([SAME_AUTHOR], RepoSharing.SAME_AUTHOR)
+    assert kanji.github.manifest_path == "manifest.json"
+    heatmap = repository.get_addon(HEATMAP)
+    assert heatmap is not None and heatmap.github is not None
+    assert (heatmap.github.shared_with, heatmap.github.repo_sharing, heatmap.github.manifest_path) == ([], None, None)
+
+
+def test_duplicates_and_sharing_in_old_snapshot(repository: AddonRepository) -> None:
+    kanji = repository.get_addon(KANJI, OLD)
+    assert kanji is not None and kanji.github is not None
+    assert (kanji.duplicates, kanji.github.shared_with, kanji.github.repo_sharing) == ([], [SAME_AUTHOR], None)
+    assert kanji.github.manifest_path == "manifest.json"
+    assert ids(repository, AddonQuery(filters=AddonFilters(is_duplicate=True)), OLD) == []
+    assert ids(repository, AddonQuery(filters=AddonFilters(duplicate_of=KANJI)), OLD) == []
+
+
 def test_description_details(repository: AddonRepository) -> None:
     details = repository.get_addon(LEGACY)
     assert details is not None
@@ -321,6 +359,11 @@ def test_find_text_no_match(repository: AddonRepository) -> None:
     (AddonFilters(is_fork=False, has_forks=False), {OCCLUSION, HEATMAP}),
     (AddonFilters(fork_of=KANJI), {NEW_ADDON, NO_GITHUB}),
     (AddonFilters(fork_of=OCCLUSION), set()),
+    (AddonFilters(is_duplicate=True), {NO_GITHUB}),
+    (AddonFilters(is_duplicate=False), {KANJI, OCCLUSION, HEATMAP, LEGACY, VIBE, NEW_ADDON, SAME_AUTHOR}),
+    (AddonFilters(has_duplicates=True), {KANJI}),
+    (AddonFilters(duplicate_of=KANJI), {NO_GITHUB}),
+    (AddonFilters(duplicate_of=OCCLUSION), set()),
     (AddonFilters(updated_after=date(2026, 9, 1)), {KANJI, VIBE, NEW_ADDON}),
     (AddonFilters(updated_before=date(2020, 1, 1)), {LEGACY}),
     (AddonFilters(archived=True), {LEGACY}),

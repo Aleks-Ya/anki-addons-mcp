@@ -22,6 +22,8 @@ Anki Forum and AI-summary and AI-tag data, published as monthly snapshots.
   compares all versions of an addon (the original, its forks and their forks), e.g. to find a maintained
   fork of an abandoned addon, and filter_addons(fork_of=id) lists direct forks. Fork detection is
   incomplete and its 'ai' evidence may be inaccurate.
+- duplicate_of/duplicates link an addon to its copies: listings whose packages are byte-identical, the best
+  rated one counting as the original. is_duplicate=False in search_addons and filter_addons hides the copies.
 - Addons carry AI tags from a fixed vocabulary (list_tags): function tags (what an addon does) and status
   tags (obsolete, paid, beta, ...). Filter with tags/exclude_tags in search_addons and filter_addons.
 - list_anki_versions lists the real Anki releases of a snapshot, newest first: use it to check a version a user

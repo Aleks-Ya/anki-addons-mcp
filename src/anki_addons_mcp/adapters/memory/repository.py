@@ -60,7 +60,7 @@ def _anki_web_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
     return checks
 
 
-def _fork_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
+def _relation_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
     checks: list[bool] = []
     if f.is_fork is not None:
         checks.append((d.forked_from is not None) == f.is_fork)
@@ -68,6 +68,12 @@ def _fork_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
         checks.append(bool(d.forks) == f.has_forks)
     if f.fork_of is not None:
         checks.append(d.forked_from is not None and d.forked_from.id == f.fork_of)
+    if f.is_duplicate is not None:
+        checks.append((d.duplicate_of is not None) == f.is_duplicate)
+    if f.has_duplicates is not None:
+        checks.append(bool(d.duplicates) == f.has_duplicates)
+    if f.duplicate_of is not None:
+        checks.append(d.duplicate_of is not None and d.duplicate_of.id == f.duplicate_of)
     return checks
 
 
@@ -122,7 +128,7 @@ def _tag_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
 
 
 def _matches(d: AddonDetails, f: AddonFilters) -> bool:
-    return all(_anki_web_checks(d, f) + _fork_checks(d, f) + _github_checks(d.github, f) + _language_checks(d, f)
+    return all(_anki_web_checks(d, f) + _relation_checks(d, f) + _github_checks(d.github, f) + _language_checks(d, f)
                + _version_checks(d.anki_web, f) + _tag_checks(d, f))
 
 

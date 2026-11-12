@@ -68,6 +68,10 @@ IsFork = Annotated[bool | None, Field(
 HasForks = Annotated[bool | None, Field(description="Other catalog addons were forked from this addon")]
 ForkOf = Annotated[int | None, Field(
     description="Only forks of this addon id, e.g. to find a maintained fork of an abandoned addon")]
+IsDuplicate = Annotated[bool | None, Field(
+    description="Addon is a copy of another catalog addon (identical package); false hides copies")]
+HasDuplicates = Annotated[bool | None, Field(description="Other catalog addons are copies of this addon")]
+DuplicateOf = Annotated[int | None, Field(description="Only copies of this addon id")]
 DescriptionFormat = Literal["text", "html"]
 _DESCRIPTION_KINDS = {"text": TextKind.DESCRIPTION, "html": TextKind.DESCRIPTION_HTML}
 
@@ -94,6 +98,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         updated_after: date | None = None, updated_before: date | None = None,
         archived: bool | None = None, author_id: AuthorId = None,
         is_fork: IsFork = None, has_forks: HasForks = None, fork_of: ForkOf = None,
+        is_duplicate: IsDuplicate = None, has_duplicates: HasDuplicates = None, duplicate_of: DuplicateOf = None,
         has_ai_declaration: HasAiDeclaration = None, has_ai_tooling: HasAiTooling = None,
         tags: Tags = None, exclude_tags: ExcludeTags = None,
         limit: Limit = 20, offset: Offset = 0, snapshot: Snapshot = "latest",
@@ -116,6 +121,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         updated_after: date | None = None, updated_before: date | None = None,
         archived: bool | None = None, author_id: AuthorId = None,
         is_fork: IsFork = None, has_forks: HasForks = None, fork_of: ForkOf = None,
+        is_duplicate: IsDuplicate = None, has_duplicates: HasDuplicates = None, duplicate_of: DuplicateOf = None,
         has_ai_declaration: HasAiDeclaration = None, has_ai_tooling: HasAiTooling = None,
         tags: Tags = None, exclude_tags: ExcludeTags = None,
         sort_by: SortField = SortField.RATING, descending: bool = True,
@@ -127,10 +133,11 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Full record of one addon: AnkiWeb info and version branches, GitHub repository data, activity (commits, "
-        "contributors, issues, pull requests, releases) and manifest, Anki Forum topic (topic_source says how it was "
-        "found), the newest package's sizes and languages, AI summary and tags, and fork relations (forked_from, forks). Long texts, "
-        "link lists and the GitHub release list are omitted unless requested in 'include'; github.release_count tells "
-        "whether there are releases."))
+        "contributors, issues, pull requests, releases), manifest and the addons sharing the repo (shared_with), "
+        "Anki Forum topic (topic_source says how it was found), the newest package's sizes and languages, AI summary "
+        "and tags, fork relations (forked_from, forks) and copies (duplicate_of, duplicates). Long texts, link lists "
+        "and the GitHub release list are omitted unless requested in 'include'; github.release_count tells whether "
+        "there are releases."))
     def get_addon(addon_id: AddonId, include: list[AddonInclude] | None = None,
                   max_chars: MaxChars = 4000, snapshot: Snapshot = "latest") -> AddonDetails:
         parts = set(include or [])

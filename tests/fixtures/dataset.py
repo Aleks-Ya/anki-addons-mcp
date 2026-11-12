@@ -163,7 +163,8 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
           github: dict[str, Any] | None = None, forum: dict[str, Any] | None = None,
           ai_summary: str | None = None, ai_tags: list[str] | None = None,
           author_addons: list[int] | None = None,
-          forked_from: tuple[int, str] | None = None, package_size_kb: int | None = 10) -> dict[str, Any]:
+          forked_from: tuple[int, str] | None = None, duplicate_of: tuple[int, str] | None = None,
+          package_size_kb: int | None = 10) -> dict[str, Any]:
     point_version, version_kind = _addons_list_version(anki_version)
     group = author_addons or [addon_id]
     return {
@@ -198,19 +199,23 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
         "author": {"id": min(group), "addon_count": len(group)},
         "forked_from": {"id": forked_from[0], "evidence": forked_from[1]} if forked_from else None,
         "forks": [],
+        "duplicate_of": {"id": duplicate_of[0], "evidence": duplicate_of[1]} if duplicate_of else None,
+        "duplicates": [],
         "package": _package_summary(addon_id),
     }
 
 
-def _link_forks(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Fills `forks` as the reverse of `forked_from`, as the dataset does."""
+def _link_relations(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Fills `forks` and `duplicates` as the reverse of `forked_from` and `duplicate_of`, as the dataset does."""
     by_id = {r["id"]: r for r in records}
     for record in by_id.values():
         record["forks"] = []
+        record["duplicates"] = []
     for record in sorted(records, key=lambda r: r["id"]):
-        relation = record["forked_from"]
-        if relation and relation["id"] in by_id:
-            by_id[relation["id"]]["forks"].append(record["id"])
+        for relation_field, reverse_field in (("forked_from", "forks"), ("duplicate_of", "duplicates")):
+            relation = record[relation_field]
+            if relation and relation["id"] in by_id:
+                by_id[relation["id"]][reverse_field].append(record["id"])
     return records
 
 
@@ -248,7 +253,8 @@ def github(user: str, repo: str, *, stars: int = 0, last_commit: str | None = "2
            languages: list[str] | None = None, topics: list[str] | None = None, archived: bool = False,
            manifest: dict[str, Any] | None = None, readme: str | None = None,
            ai_tooling: list[str] | None = None, repo_source: str = "self_reference",
-           fork_source: str | None = None, activity: dict[str, Any] | None = None) -> dict[str, Any]:
+           fork_source: str | None = None, activity: dict[str, Any] | None = None,
+           shared_with: list[int] | None = None, repo_sharing: str | None = None) -> dict[str, Any]:
     return {
         "user": user, "repo": repo, "repo_source": repo_source, "languages": languages or ["Python"], "stars": stars,
         "last_commit": last_commit,
@@ -258,8 +264,10 @@ def github(user: str, repo: str, *, stars: int = 0, last_commit: str | None = "2
         "archived": archived, "pushed_at": last_commit, "created_at": "2020-01-01T00:00:00",
         "primary_language": (languages or ["Python"])[0],
         "language_bytes": [{"name": (languages or ["Python"])[0], "bytes": 1000}],
-        "manifest": manifest, "dependencies": ["requests"] if manifest else [], "readme": readme,
+        "manifest": manifest, "manifest_path": "manifest.json" if manifest else None,
+        "dependencies": ["requests"] if manifest else [], "readme": readme,
         "ai_tooling_markers": ai_tooling or [], "fork_source": fork_source,
+        "shared_with": shared_with or [], "repo_sharing": repo_sharing,
         **_activity(user), **(activity or {}),
     }
 
@@ -272,8 +280,9 @@ def forum(topic_id: int, posts: int, topic_source: str = "contact_author") -> di
 
 def latest_records() -> list[dict[str, Any]]:
     # Fork families: KANJI -> NEW_ADDON -> SAME_AUTHOR (a fork of a fork) and KANJI -> NO_GITHUB (a sibling);
-    # LEGACY -> VIBE.
-    return _link_forks([
+    # LEGACY -> VIBE. NO_GITHUB is also a copy of KANJI. KANJI and SAME_AUTHOR share a repo (given, not derived from
+    # user/repo).
+    return _link_relations([
         addon(KANJI, "Kanji Helper", rating=130, likes=125, dislikes=5, update_date="2026-09-20",
               anki_version="25.02~", branches=[("2.1.0", "2.1.49"), ("25.02", "+")],
               description="Look up kanji stroke order and readings while reviewing japanese vocabulary.",
@@ -282,7 +291,7 @@ def latest_records() -> list[dict[str, Any]]:
               ai_tags=["dictionary", "card-templates", "mobile-compatible"],
               github=github("alice", "kanji-helper", stars=50, tests=12, actions=2, topics=["japanese", "kanji"],
                             manifest=_manifest(231000, None), readme="# Kanji Helper\nStroke order for kanji.",
-                            activity=KANJI_ACTIVITY),
+                            activity=KANJI_ACTIVITY, shared_with=[SAME_AUTHOR], repo_sharing="same_author"),
               forum=forum(11, 30)),
         addon(OCCLUSION, "Image Occlusion Plus", rating=320, likes=310, dislikes=10, update_date="2026-08-01",
               anki_version="2.1.66~", branches=[("2.1.66", "25.09+")],
@@ -306,7 +315,7 @@ def latest_records() -> list[dict[str, Any]]:
         addon(NO_GITHUB, "Simple Timer", rating=15, likes=15, update_date="2025-11-11", anki_version="",
               branches=[("2.1.50", "+")], description="A timer for review sessions. Zeitmesser.", lang="de",
               author_addons=ALICE_ADDONS, package_size_kb=None,
-              ai_tags=["timer"], forked_from=(KANJI, "ai")),
+              ai_tags=["timer"], forked_from=(KANJI, "ai"), duplicate_of=(KANJI, "same_package")),
         addon(VIBE, "Vibe Deck Tools", rating=4, likes=3, dislikes=1, update_date="2026-09-29",
               anki_version="25.09~", branches=[("25.09", "+")], description="Deck tools vibe-coded with claude.",
               ai_declaration=["claude", "vibe-coded"], ai_tags=["deck-management", "beta"],
@@ -322,7 +331,8 @@ def latest_records() -> list[dict[str, Any]]:
         addon(SAME_AUTHOR, "Alice Utilities", rating=42, likes=41, dislikes=1, update_date="2026-05-05",
               anki_version="23.10~", branches=[("23.10", "+")], description="Assorted utilities.",
               author_addons=ALICE_ADDONS, forked_from=(NEW_ADDON, "override"),
-              github=github("Alice", "alice-utils", stars=20, topics=["utilities"])),
+              github=github("Alice", "alice-utils", stars=20, topics=["utilities"], shared_with=[KANJI],
+                            repo_sharing="same_author")),
     ])
 
 
@@ -339,12 +349,15 @@ def old_records() -> list[dict[str, Any]]:
         # Snapshots collected before authors were tracked: an all-null column, as published.
         record["author"] = None
         record["package"] = None
+        # No packages, so no duplicates; repo sharing needs the authors. shared_with and manifest_path stay.
+        record["duplicate_of"] = None
         if record["github"]:
+            record["github"]["repo_sharing"] = None
             record["github"]["manifest"] = None
             record["github"]["readme"] = None
             record["github"]["dependencies"] = []
             record["github"].update(NO_ACTIVITY)
-    return _link_forks(list(by_id.values()))
+    return _link_relations(list(by_id.values()))
 
 
 def _metadata(snapshot: date) -> dict[str, str]:

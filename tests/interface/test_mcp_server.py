@@ -230,7 +230,7 @@ async def test_statistics_top_similar_author(client: Client) -> None:
     top = await call(client, "top_addons", metric="stars", limit=1)
     assert top["items"][0]["id"] == OCCLUSION
     similar = await call(client, "find_similar_addons", addon_id=KANJI, limit=3)
-    assert similar["result"][0]["card"]["id"] == NEW_ADDON
+    assert similar["result"][0]["card"]["id"] == NO_GITHUB
     author = await call(client, "list_addons_by_author", github_user="alice")
     assert author["total"] == 2
 
@@ -259,6 +259,17 @@ async def test_fork_filters_and_details(client: Client) -> None:
     assert details["github"]["fork_source"] == "alice/kanji-helper"
     forks = await call(client, "search_addons", query="kanji", has_forks=True)
     assert {item["id"] for item in forks["items"]} == {KANJI, NEW_ADDON}
+
+
+async def test_duplicate_filters_and_details(client: Client) -> None:
+    copies = await call(client, "filter_addons", duplicate_of=KANJI)
+    assert [(item["id"], item["duplicate_of"]) for item in copies["items"]] == [(NO_GITHUB, KANJI)]
+    originals = await call(client, "search_addons", query="timer", is_duplicate=False)
+    assert originals["total"] == 0
+    details = await call(client, "get_addon", addon_id=KANJI)
+    assert (details["duplicate_of"], details["duplicates"]) == (None, [NO_GITHUB])
+    assert (details["github"]["shared_with"], details["github"]["repo_sharing"]) == ([SAME_AUTHOR], "same_author")
+    assert details["github"]["manifest_path"] == "manifest.json"
 
 
 

@@ -133,13 +133,19 @@ def _anki_web_filters(f: AddonFilters, add: _Add) -> None:
         add("author_id = ?", f.author_id)
 
 
-def _fork_filters(f: AddonFilters, add: _Add) -> None:
+def _relation_filters(f: AddonFilters, add: _Add) -> None:
     if f.is_fork is not None:
         add("(forked_from IS NOT NULL) = ?", f.is_fork)
     if f.has_forks is not None:
         add("(coalesce(len(forks), 0) > 0) = ?", f.has_forks)
     if f.fork_of is not None:
         add("forked_from.id = ?", f.fork_of)
+    if f.is_duplicate is not None:
+        add("(duplicate_of IS NOT NULL) = ?", f.is_duplicate)
+    if f.has_duplicates is not None:
+        add("(coalesce(len(duplicates), 0) > 0) = ?", f.has_duplicates)
+    if f.duplicate_of is not None:
+        add("duplicate_of.id = ?", f.duplicate_of)
 
 
 def _github_filters(f: AddonFilters, add: _Add) -> None:
@@ -187,7 +193,7 @@ def _filters_sql(f: AddonFilters) -> tuple[list[str], list[Any]]:
         params.extend(values)
 
     _anki_web_filters(f, add)
-    _fork_filters(f, add)
+    _relation_filters(f, add)
     _github_filters(f, add)
     _language_filters(f, add)
     _version_and_tag_filters(f, add)

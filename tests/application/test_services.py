@@ -293,7 +293,7 @@ def test_similar(services: Services) -> None:
     similar = services.similarity.similar(KANJI, 5)
     by_id = {s.card.id: s for s in similar}
     assert KANJI not in by_id
-    assert similar[0].card.id == NEW_ADDON
+    assert similar[0].card.id == NO_GITHUB
     assert any("shared GitHub topics" in r for r in by_id[NEW_ADDON].reasons)
     assert "same AnkiWeb author" in by_id[SAME_AUTHOR].reasons
 
@@ -306,6 +306,29 @@ def test_similar_lists_forks(services: Services) -> None:
 def test_similar_lists_fork_parent(services: Services) -> None:
     by_id = {s.card.id: s for s in services.similarity.similar(VIBE, 5)}
     assert "this addon is a fork of it (ai evidence)" in by_id[LEGACY].reasons
+
+
+def test_similar_lists_copies(services: Services) -> None:
+    by_id = {s.card.id: s for s in services.similarity.similar(KANJI, 5)}
+    assert "identical package: a copy of this addon" in by_id[NO_GITHUB].reasons
+    by_id = {s.card.id: s for s in services.similarity.similar(NO_GITHUB, 5)}
+    assert "identical package: this addon is a copy of it (same_package evidence)" in by_id[KANJI].reasons
+
+
+@pytest.mark.parametrize(("snapshot", "reason"), [(None, "shares the GitHub repo (same_author)"),
+                                                  (OLD, "shares the GitHub repo")])
+def test_similar_lists_shared_repo(services: Services, snapshot: date | None, reason: str) -> None:
+    by_id = {s.card.id: s for s in services.similarity.similar(KANJI, 5, snapshot)}
+    assert reason in by_id[SAME_AUTHOR].reasons
+
+
+def test_maintenance_notes_shared_repo(services: Services) -> None:
+    report = services.maintenance.assess(KANJI)
+    assert (report.signals.github_shared_with, report.signals.github_repo_sharing) == ([SAME_AUTHOR], "same_author")
+    assert ("The GitHub repo is shared with 1 other addon; its commits, issues and releases are not specific to "
+            "this one.") in report.reasons
+    unshared = services.maintenance.assess(OCCLUSION)
+    assert not any("shared" in reason for reason in unshared.reasons)
 
 
 def test_maintenance_points_abandoned_addon_to_its_forks(services: Services) -> None:

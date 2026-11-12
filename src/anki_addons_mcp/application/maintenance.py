@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from anki_addons_mcp.application.catalog import CatalogService
 from anki_addons_mcp.application.snapshots import SnapshotService
 from anki_addons_mcp.domain.errors import AddonNotFound
-from anki_addons_mcp.domain.models import AddonDetails, GithubInfo
+from anki_addons_mcp.domain.models import AddonDetails, GithubInfo, RepoSharing
 
 
 class MaintenanceLabel(StrEnum):
@@ -44,6 +44,10 @@ class MaintenanceSignals(BaseModel):
     github_latest_release_at: str | None = None
     github_tests_count: int | None = None
     github_action_count: int | None = None
+    github_shared_with: list[int] = Field(
+        default_factory=list, description="Other addons with the same repo: the GitHub signals are the repo's, not "
+                                          "this addon's alone")
+    github_repo_sharing: RepoSharing | None = None
     forum_last_posted_at: str | None
     forum_posts_count: int | None
     last_activity: date | None
@@ -104,6 +108,8 @@ def _github_signals(github: GithubInfo | None) -> dict[str, Any]:
         "github_latest_release_at": github.latest_release_at,
         "github_tests_count": github.tests_count,
         "github_action_count": github.action_count,
+        "github_shared_with": list(github.shared_with),
+        "github_repo_sharing": github.repo_sharing,
     }
 
 
@@ -117,6 +123,10 @@ def _hours(hours: float) -> str:
 def _responsiveness_reasons(signals: MaintenanceSignals) -> list[str]:
     """Context for the label, which rests on dates alone: a stable addon can go long without a commit."""
     reasons = []
+    if signals.github_shared_with:
+        count = len(signals.github_shared_with)
+        reasons.append(f"The GitHub repo is shared with {count} other addon{'s' if count > 1 else ''}; its commits, "
+                       "issues and releases are not specific to this one.")
     if signals.github_commits_last_year is not None:
         reasons.append(f"Commits in the last year: {signals.github_commits_last_year}.")
     if signals.github_has_issues_enabled is False:

@@ -14,7 +14,7 @@ see [Dataset notes](dataset-notes.md).
 |---|---|
 | `search_addons` | Full-text search over titles, descriptions, AI summaries and tags, GitHub topics; accepts every filter of `filter_addons` |
 | `filter_addons` | Structured query with [filters](#filters), sorted by rating (approval), likes, stars, update date, last commit, forum posts or `anki_version` |
-| `find_similar_addons` | Find addons similar to a given one: shared wording, topics, AI tags, author or fork relation |
+| `find_similar_addons` | Find addons similar to a given one: shared wording, topics, AI tags, author, fork relation, copies or a shared GitHub repo |
 | `list_addons_by_author` | List the addons of a GitHub user, or of an AnkiWeb author by `author_id` or by any of their addons (`addon_id`) |
 | `top_addons` | Leaderboard by rating, likes, stars, forum posts or recency, optionally within one AI tag |
 
@@ -22,7 +22,7 @@ see [Dataset notes](dataset-notes.md).
 
 | Tool | Use it to |
 |---|---|
-| `get_addon` | Get the full record: AnkiWeb, GitHub (with activity), forum topic, newest package, AI summary and tags, fork relations; long texts and the release list with `include` |
+| `get_addon` | Get the full record: AnkiWeb, GitHub (with activity and the addons sharing the repo), forum topic, newest package, AI summary and tags, fork relations, copies; long texts and the release list with `include` |
 | `get_addon_readme` | Read the GitHub README as markdown |
 | `get_addon_description` | Read the AnkiWeb description as plain text, or the author's HTML with `format=html` |
 | `get_addon_reviews` | Read AnkiWeb reviews newest first, filtered by `vote`, `contains` text and `since` date, e.g. reports of breakage on a new Anki |
@@ -77,6 +77,7 @@ schemas.
 | `updated_after`, `updated_before`, `archived` | by AnkiWeb update date or GitHub archived flag |
 | `author_id` | of one AnkiWeb author |
 | `is_fork`, `has_forks`, `fork_of` | by [fork relations](#forks) |
+| `is_duplicate`, `has_duplicates`, `duplicate_of` | by [copies](#duplicates-and-shared-repos); `is_duplicate=false` hides copies |
 | `has_ai_declaration`, `has_ai_tooling` | whose description mentions AI use, or whose repo has AI coding tool traces |
 | `tags`, `exclude_tags` | with all / none of these AI tags (`list_tags`) |
 
@@ -101,6 +102,15 @@ The resource `anki-addons://dataset/anki-versions` explains the encoding and how
 `find_similar_addons` and `assess_maintenance` point to forks, e.g. a maintained fork of an abandoned addon.
 `compare_forks` returns the family of an addon (the original, its forks and forks of forks; the same family from
 any member) with each version's place in it, compatibility, maintenance label, votes, stars and status flags.
+
+### Duplicates and shared repos
+
+`get_addon` shows `duplicate_of` (the addon this one is a copy of, with evidence `same_package` or `override`) and
+`duplicates`; addon cards carry the ids. A copy is a listing whose newest package is byte-identical to another's;
+the best rated of the group counts as the original. `github.shared_with` lists the other addons with the same GitHub
+repo and `github.repo_sharing` says whether they share an author (`same_author`, `cross_author`). Repo-level data
+(stars, commits, issues, releases) repeats across them. `find_similar_addons` lists copies and addons of the same
+repo, and `assess_maintenance` says when its GitHub signals belong to a shared repo.
 
 ## Resources
 

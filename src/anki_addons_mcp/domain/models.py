@@ -13,6 +13,10 @@ AUTHOR_ID_DESCRIPTION = ("Derived AnkiWeb author: the smallest addon id among th
                          "were tracked.")
 FORK_DESCRIPTION = ("Fork relations: detection is incomplete (a fork that neither uses a GitHub fork nor links the "
                     "original from its description is missed), and 'ai' evidence may be inaccurate.")
+DUPLICATE_DESCRIPTION = ("Duplicates: listings whose newest packages are byte-identical; of such a group the best rated "
+                         "addon counts as the original. None in snapshots before 2026-11-01, which have no packages.")
+SHARED_REPO_DESCRIPTION = ("All repo-level fields (stars, issues, commits, releases, ...) repeat across these addons: "
+                           "count each repo once before summing them.")
 GITHUB_ACTIVITY_NULL = "Null in snapshots before 2026-11-01 and when GitHub gave no answer at collection time."
 _Z = 1.96
 
@@ -94,6 +98,22 @@ class ForkRelation(BaseModel):
                     "description; may be inaccurate) or 'override' (set by hand)")
 
 
+class DuplicateEvidence(StrEnum):
+    SAME_PACKAGE = "same_package"
+    OVERRIDE = "override"
+
+
+class DuplicateRelation(BaseModel):
+    id: int = Field(description="AnkiWeb id of the addon this one is a copy of")
+    evidence: DuplicateEvidence = Field(
+        description="'same_package' (the newest packages are byte-identical) or 'override' (set by hand)")
+
+
+class RepoSharing(StrEnum):
+    SAME_AUTHOR = "same_author"
+    CROSS_AUTHOR = "cross_author"
+
+
 class GithubLink(BaseModel):
     url: str
     user: str | None = None
@@ -162,7 +182,17 @@ class GithubInfo(BaseModel):
     created_at: str | None = None
     primary_language: str | None = None
     language_bytes: list[LanguageBytes] = Field(default_factory=list)
-    manifest: Manifest | None = None
+    manifest: Manifest | None = Field(
+        default=None, description="The addon's own manifest.json in the repo, at manifest_path; null when the repo "
+                                  "has several and none is clearly this addon's")
+    manifest_path: str | None = Field(default=None, description="Path of the addon's manifest.json in the repo")
+    shared_with: list[int] = Field(
+        default_factory=list, description="Other addons with the same repo (a repo of many addons, the same addon "
+                                          "listed twice, or a fork that links its original); empty when not shared. "
+                                          + SHARED_REPO_DESCRIPTION)
+    repo_sharing: RepoSharing | None = Field(
+        default=None, description="'same_author' or 'cross_author' when the repo is shared; null otherwise or when "
+                                  "an author is unknown (always in snapshots before 2026-11-01)")
     dependencies: list[str] = Field(default_factory=list)
     ai_tooling_markers: list[str] = Field(default_factory=list)
     fork_source: str | None = Field(
@@ -294,6 +324,10 @@ class AddonDetails(BaseModel):
     forked_from: ForkRelation | None = Field(
         default=None, description="The addon this one was forked from; an addon has at most one. " + FORK_DESCRIPTION)
     forks: list[int] = Field(default_factory=list, description="Addons forked from this one. " + FORK_DESCRIPTION)
+    duplicate_of: DuplicateRelation | None = Field(
+        default=None, description="The addon this one is a copy of. " + DUPLICATE_DESCRIPTION)
+    duplicates: list[int] = Field(default_factory=list,
+                                  description="Copies of this addon. " + DUPLICATE_DESCRIPTION)
     package: PackageSummary | None = Field(
         default=None, description="The package of the branch with the highest minimum Anki version; "
                                   "get_addon_packages lists all branches. Null when the snapshot holds no package of "
@@ -329,6 +363,8 @@ class AddonCard(BaseModel):
     author_id: int | None = Field(default=None, description=AUTHOR_ID_DESCRIPTION)
     forked_from: int | None = Field(default=None, description="Addon this one was forked from")
     forks: list[int] = Field(default_factory=list, description="Addons forked from this one")
+    duplicate_of: int | None = Field(default=None, description="Addon this one is a copy of (identical package)")
+    duplicates: list[int] = Field(default_factory=list, description="Copies of this addon (identical packages)")
     score: float | None = None
 
     @computed_field(description=APPROVAL_DESCRIPTION)
@@ -361,6 +397,8 @@ class AddonCard(BaseModel):
             author_id=details.author.id if details.author else None,
             forked_from=details.forked_from.id if details.forked_from else None,
             forks=list(details.forks),
+            duplicate_of=details.duplicate_of.id if details.duplicate_of else None,
+            duplicates=list(details.duplicates),
             score=score,
         )
 

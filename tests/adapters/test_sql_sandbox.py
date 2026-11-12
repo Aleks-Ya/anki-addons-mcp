@@ -115,6 +115,17 @@ def test_dataset_4_2_columns(duckdb_repository: DuckDbAddonRepository, snapshot:
     assert result.rows == [expected]
 
 
+# Dataset 4.3.0 added duplicates, shared repos and the manifest path; OLD has neither duplicates nor repo_sharing.
+@pytest.mark.parametrize(("snapshot", "expected"), [(None, [1, 1, 2, 2, 2]), (OLD, [0, 0, 2, 0, 2])])
+def test_dataset_4_3_columns(duckdb_repository: DuckDbAddonRepository, snapshot: date | None,
+                             expected: list[object]) -> None:
+    result = duckdb_repository.execute_readonly(
+        "SELECT count(*) FILTER (duplicate_of.evidence = 'same_package'), sum(len(duplicates)), "
+        "count(*) FILTER (len(github_shared_with) > 0), count(github_repo_sharing), count(github_manifest_path) "
+        "FROM addons", snapshot, 10, 5)
+    assert result.rows == [expected]
+
+
 @pytest.mark.parametrize("snapshot", [None, OLD])
 def test_package_size_kb_column(duckdb_repository: DuckDbAddonRepository, snapshot: date | None) -> None:
     result = duckdb_repository.execute_readonly(

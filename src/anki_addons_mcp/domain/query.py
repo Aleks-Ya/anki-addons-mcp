@@ -32,6 +32,9 @@ class AddonFilters(BaseModel):
     is_fork: bool | None = None
     has_forks: bool | None = None
     fork_of: int | None = None
+    is_duplicate: bool | None = None
+    has_duplicates: bool | None = None
+    duplicate_of: int | None = None
     updated_after: date | None = None
     updated_before: date | None = None
     archived: bool | None = None

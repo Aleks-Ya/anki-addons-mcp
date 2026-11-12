@@ -16,6 +16,9 @@ Some fields are produced by an LLM and may be wrong; the server labels them as s
 
 - **Forks.** Fork detection is incomplete: an addon without `forked_from` may still be a fork, and a fork
   family of one member only means no relations are known.
+- **Shared repos.** Addons in `github.shared_with` have the same repo, so stars, commits, issues and releases
+  repeat across them: count each repo once before summing in `query_sql`. `github.manifest` is the addon's own
+  manifest in such a repo, and null when none is clearly its own.
 - **Forum topics.** `forum.topic_source` in `get_addon` tells how the topic was matched: `override`,
   `contact_author`, `ai`, `most_linked` or `title_match`.
 - **Maintenance label.** `assess_maintenance` labels an addon by dates and the archived flag only; a stable addon
@@ -31,6 +34,8 @@ Snapshots are monthly, and older ones lack data that was added to the dataset la
 | GitHub activity (commits per week, contributors, issue and PR counts, response time, releases) | snapshots before 2026-11-01 | `get_addon`, `assess_maintenance` signals |
 | Anki release dates | snapshots before 2026-11-01, most versions before 2.1.22 | `list_anki_versions` |
 | Anki releases list | snapshots collected before the dataset published it | `list_anki_versions` (empty) |
+| Duplicates (`duplicate_of`, `duplicates`) | snapshots before 2026-11-01 (they need packages) | `get_addon`, `is_duplicate`/`has_duplicates`/`duplicate_of` filters |
+| Repo sharing kind (`github.repo_sharing`) | snapshots before 2026-11-01 (it needs authors); `shared_with` is present | `get_addon`, `find_similar_addons` reasons |
 | AnkiWeb authors | snapshots collected before authors were tracked | `list_addons_by_author` by `author_id`/`addon_id`, `author_id` filter; use `github_user` instead |
 
 History tools (`get_addon_history`, `diff_snapshots`) download older snapshots on first use, which can take a
