@@ -61,6 +61,11 @@ that the hourly refresh finds nothing new: a new snapshot reaches users only wit
    ```
 5. [Release a new version](#release-a-new-version) and [deploy](#deploy-to-a-huggingface-space) it.
 
+Steps 1–4 are automated by the skill `/update-dataset`. Its scripts compare the two tags (changelog, docs, real Parquet
+schemas and values), list the dataset columns the server doesn't read yet, check the dataset for inconsistencies and
+run every tool against the real data. The skill negotiates a modification plan before it edits anything, and it writes
+what must change in the dataset itself as a ready-to-paste AI prompt for the dataset repo.
+
 ## Release a new version
 
 The version lives in `src/anki_addons_mcp/__init__.py` (`__version__`) and is bumped with
