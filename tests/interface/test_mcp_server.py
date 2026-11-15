@@ -93,6 +93,14 @@ async def test_filter(client: Client) -> None:
     assert page["total"] == 2
 
 
+async def test_filter_by_primary_language(client: Client) -> None:
+    anywhere = await call(client, "filter_addons", language="JavaScript")
+    assert [item["id"] for item in anywhere["items"]] == [OCCLUSION]
+    assert anywhere["items"][0]["primary_language"] == "Python"
+    mainly = await call(client, "search_addons", query="occlusion", primary_language="JavaScript")
+    assert mainly["total"] == 0
+
+
 async def test_filter_by_date(client: Client) -> None:
     page = await call(client, "filter_addons", updated_after="2026-09-21", limit=5)
     assert page["total"] == 2

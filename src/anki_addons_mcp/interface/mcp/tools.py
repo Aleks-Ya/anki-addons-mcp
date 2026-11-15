@@ -48,8 +48,12 @@ Tags = Annotated[list[str] | None, Field(
 ExcludeTags = Annotated[list[str] | None, Field(
     description="AI tags the addon must not have, e.g. ['obsolete', 'no-description', 'paid']")]
 Language = Annotated[str | None, Field(
-    description="Language of the GitHub repo or detected in the AnkiWeb package, case-insensitive, e.g. Python, "
-                "JavaScript")]
+    description="Any language of the GitHub repo or found in the AnkiWeb package, bundled libraries and data formats "
+                "included, case-insensitive, e.g. JavaScript; use primary_language for what the addon is mainly "
+                "written in")]
+PrimaryLanguage = Annotated[str | None, Field(
+    description="Main programming language, as on the cards: of the newest package, else of the GitHub repo; "
+                "case-insensitive, e.g. Python, JavaScript")]
 DescriptionLanguage = Annotated[str | None, Field(description="ISO code of the description")]
 AnkiVersionKind = Annotated[VersionKind | None, Field(
     description="Meaning of the addon's newest supported Anki version: hard (Anki disables it on newer "
@@ -92,7 +96,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         query: Annotated[str, Field(description="Search words, e.g. 'image occlusion'")],  # NOSONAR - flat MCP tool parameters
         min_rating: int | None = None, min_likes: int | None = None, min_stars: int | None = None,
         has_github: bool | None = None, has_tests: bool | None = None, has_forum: bool | None = None,
-        language: Language = None, description_language: DescriptionLanguage = None,
+        language: Language = None, primary_language: PrimaryLanguage = None,
+        description_language: DescriptionLanguage = None,
         compatible_with_anki: AnkiVersion = None,
         anki_version_kind: AnkiVersionKind = None, anki_version_at_least: AnkiVersionAtLeast = None,
         updated_after: date | None = None, updated_before: date | None = None,
@@ -115,7 +120,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
     def filter_addons(
         min_rating: int | None = None, min_likes: int | None = None, min_stars: int | None = None,  # NOSONAR - flat MCP tool parameters
         has_github: bool | None = None, has_tests: bool | None = None, has_forum: bool | None = None,
-        language: Language = None, description_language: DescriptionLanguage = None,
+        language: Language = None, primary_language: PrimaryLanguage = None,
+        description_language: DescriptionLanguage = None,
         compatible_with_anki: AnkiVersion = None,
         anki_version_kind: AnkiVersionKind = None, anki_version_at_least: AnkiVersionAtLeast = None,
         updated_after: date | None = None, updated_before: date | None = None,

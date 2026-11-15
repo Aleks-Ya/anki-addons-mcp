@@ -369,6 +369,9 @@ def test_find_text_no_match(repository: AddonRepository) -> None:
     (AddonFilters(has_forum=True), {KANJI, OCCLUSION}),
     (AddonFilters(language="javascript"), {OCCLUSION}),
     (AddonFilters(language="HANDLEBARS"), {KANJI}),
+    # OCCLUSION's repo lists JavaScript, but its package is mainly Python.
+    (AddonFilters(primary_language="JAVASCRIPT"), set()),
+    (AddonFilters(primary_language="python"), {KANJI, OCCLUSION, HEATMAP, LEGACY, VIBE, NEW_ADDON, SAME_AUTHOR}),
     (AddonFilters(description_language="DE"), {NO_GITHUB}),
     (AddonFilters(github_user="alice"), {KANJI, SAME_AUTHOR}),
     (AddonFilters(author_id=KANJI), set(ALICE_ADDONS)),
@@ -494,6 +497,11 @@ def test_card_primary_language(repository: AddonRepository) -> None:
     assert language(HEATMAP) == "Python"  # no package: the GitHub repo's
     assert language(NO_GITHUB) is None
     assert language(KANJI, OLD) == "Python"  # no packages before 2026-11-01
+
+
+def test_primary_language_filter_falls_back_to_github(repository: AddonRepository) -> None:
+    query = AddonQuery(filters=AddonFilters(primary_language="javascript"))
+    assert [card.id for card in repository.find(query, OLD).items] == [OCCLUSION]  # no packages before 2026-11-01
 
 
 def test_group_counts(repository: AddonRepository) -> None:

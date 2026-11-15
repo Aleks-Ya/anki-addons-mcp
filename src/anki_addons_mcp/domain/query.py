@@ -26,6 +26,7 @@ class AddonFilters(BaseModel):
     has_tests: bool | None = None
     has_forum: bool | None = None
     language: str | None = None
+    primary_language: str | None = None
     description_language: str | None = None
     github_user: str | None = None
     author_id: int | None = None

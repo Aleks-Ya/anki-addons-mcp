@@ -169,6 +169,8 @@ def _language_filters(f: AddonFilters, add: _Add) -> None:
             " OR lower(github_primary_language) = lower(?)"
             " OR list_contains(list_transform(package.language_bytes, lambda x: lower(x.name)), lower(?)))",
             f.language, f.language, f.language)
+    if f.primary_language is not None:
+        add("lower(primary_language) = lower(?)", f.primary_language)
 
 
 def _version_and_tag_filters(f: AddonFilters, add: _Add) -> None:

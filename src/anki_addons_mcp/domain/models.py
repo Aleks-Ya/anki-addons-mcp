@@ -371,6 +371,11 @@ class AddonDetails(BaseModel):
     description_html: str | None = None
     readme: str | None = None
 
+    def primary_language(self) -> str | None:
+        """Main programming language: of the newest package, else of the GitHub repo."""
+        return (self.package.primary_language if self.package else None) or (
+            self.github.primary_language if self.github else None)
+
     def without_texts(self) -> "AddonDetails":
         return self.model_copy(update={"description": None, "description_html": None, "readme": None})
 
@@ -432,8 +437,7 @@ class AddonCard(BaseModel):
             github_archived=github.archived if github else None,
             license=details.license.spdx_id if details.license else None,
             license_source=details.license.source if details.license else None,
-            primary_language=(details.package.primary_language if details.package else None)
-            or (github.primary_language if github else None),
+            primary_language=details.primary_language(),
             forum_posts_count=details.forum.posts_count if details.forum else None,
             ai_tags=list(details.ai.tags) if details.ai else [],
             author_id=details.author.id if details.author else None,
