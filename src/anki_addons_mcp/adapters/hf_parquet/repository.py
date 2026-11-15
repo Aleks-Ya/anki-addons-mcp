@@ -212,10 +212,7 @@ class _State:
         self.source = source
         self.con = duckdb.connect(":memory:")
         self.relations: dict[date, str] = {}
-        self.tag_tables: dict[date, str] = {}
-        self.anki_version_tables: dict[date, str] = {}
-        self.review_tables: dict[date, str] = {}
-        self.package_tables: dict[date, str] = {}
+        self.tables: set[str] = set()
         self.fts: set[str] = set()
         self.lock = threading.RLock()
         self.fts_available = self._load_fts()
@@ -254,65 +251,38 @@ class _State:
             log.info("Loaded snapshot %s as %s", resolved, name)
             return name
 
-    def tag_table(self, snapshot: date | None) -> str:
+    def _table(self, prefix: str, snapshot: date | None, select: Callable[[date], str]) -> str:
+        """A table of one snapshot file, created on first use; select fetches the file (outside the lock) and
+        gives its SELECT."""
         resolved = snapshot or self.source.latest_date()
+        name = f"{prefix}_{resolved.strftime('%Y%m%d')}"
         with self.lock:
-            if resolved in self.tag_tables:
-                return self.tag_tables[resolved]
+            if name in self.tables:
+                return name
         if resolved not in self.source.snapshot_dates():
             raise SnapshotNotFound(resolved)
-        path = str(self.source.tags_file(resolved))
+        query = select(resolved)
         with self.lock:
-            if resolved not in self.tag_tables:
-                name = f"tags_{resolved.strftime('%Y%m%d')}"
-                self.con.execute(f"CREATE TABLE {name} AS {tags_select(path)}")
-                self.tag_tables[resolved] = name
-            return self.tag_tables[resolved]
+            if name not in self.tables:
+                self.con.execute(f"CREATE TABLE {name} AS {query}")
+                self.tables.add(name)
+            return name
+
+    def tag_table(self, snapshot: date | None) -> str:
+        return self._table("tags", snapshot, lambda d: tags_select(str(self.source.tags_file(d))))
 
     def anki_version_table(self, snapshot: date | None) -> str:
-        resolved = snapshot or self.source.latest_date()
-        with self.lock:
-            if resolved in self.anki_version_tables:
-                return self.anki_version_tables[resolved]
-        if resolved not in self.source.snapshot_dates():
-            raise SnapshotNotFound(resolved)
-        path = self.source.anki_versions_file(resolved)
-        with self.lock:
-            if resolved not in self.anki_version_tables:
-                name = f"anki_versions_{resolved.strftime('%Y%m%d')}"
-                self.con.execute(f"CREATE TABLE {name} AS {anki_versions_select(str(path) if path else None)}")
-                self.anki_version_tables[resolved] = name
-            return self.anki_version_tables[resolved]
+        def select(resolved: date) -> str:
+            path = self.source.anki_versions_file(resolved)
+            return anki_versions_select(str(path) if path else None)
+
+        return self._table("anki_versions", snapshot, select)
 
     def review_table(self, snapshot: date | None) -> str:
-        resolved = snapshot or self.source.latest_date()
-        with self.lock:
-            if resolved in self.review_tables:
-                return self.review_tables[resolved]
-        if resolved not in self.source.snapshot_dates():
-            raise SnapshotNotFound(resolved)
-        path = str(self.source.reviews_file(resolved))
-        with self.lock:
-            if resolved not in self.review_tables:
-                name = f"reviews_{resolved.strftime('%Y%m%d')}"
-                self.con.execute(f"CREATE TABLE {name} AS {reviews_select(path)}")
-                self.review_tables[resolved] = name
-            return self.review_tables[resolved]
+        return self._table("reviews", snapshot, lambda d: reviews_select(str(self.source.reviews_file(d))))
 
     def package_table(self, snapshot: date | None) -> str:
-        resolved = snapshot or self.source.latest_date()
-        with self.lock:
-            if resolved in self.package_tables:
-                return self.package_tables[resolved]
-        if resolved not in self.source.snapshot_dates():
-            raise SnapshotNotFound(resolved)
-        path = str(self.source.packages_file(resolved))
-        with self.lock:
-            if resolved not in self.package_tables:
-                name = f"packages_{resolved.strftime('%Y%m%d')}"
-                self.con.execute(f"CREATE TABLE {name} AS {packages_select(path)}")
-                self.package_tables[resolved] = name
-            return self.package_tables[resolved]
+        return self._table("packages", snapshot, lambda d: packages_select(str(self.source.packages_file(d))))
 
     def _index(self, table: str) -> None:
         if not self.fts_available:
