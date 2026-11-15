@@ -175,7 +175,6 @@ class GithubInfo(BaseModel):
     user: str | None = None
     repo: str | None = None
     repo_source: str | None = None
-    languages: list[str] = Field(default_factory=list)
     stars: int = 0
     last_commit: str | None = None
     links: list[GithubLink] = Field(default_factory=list)
@@ -198,7 +197,8 @@ class GithubInfo(BaseModel):
     pushed_at: str | None = None
     created_at: str | None = None
     primary_language: str | None = None
-    language_bytes: list[LanguageBytes] = Field(default_factory=list)
+    language_bytes: list[LanguageBytes] = Field(
+        default_factory=list, description="Bytes per language in the repo, most first; GitHub Linguist names")
     manifest: Manifest | None = Field(
         default=None, description="The addon's own manifest.json in the repo, at manifest_path; null when the repo "
                                   "has several and none is clearly this addon's")

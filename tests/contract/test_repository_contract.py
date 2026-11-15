@@ -488,6 +488,14 @@ def test_aggregation_author_number(repository: AddonRepository, snapshot: date, 
     assert repository.get_aggregation(snapshot).author_number == authors
 
 
+def test_github_languages_only_with_bytes(repository: AddonRepository) -> None:
+    details = repository.get_addon(OCCLUSION)
+    assert details is not None
+    assert details.github is not None
+    assert "languages" not in details.github.model_dump()
+    assert [lb.name for lb in details.github.language_bytes] == ["JavaScript", "Python"]
+
+
 def test_card_primary_language(repository: AddonRepository) -> None:
     def language(addon_id: int, snapshot: date | None = None) -> str | None:
         query = AddonQuery(filters=AddonFilters(addon_ids=[addon_id]))

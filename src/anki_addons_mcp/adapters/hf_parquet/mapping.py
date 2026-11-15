@@ -85,7 +85,6 @@ def _github(row: dict[str, Any]) -> GithubInfo:
         user=row["github_user"],
         repo=row["github_repo"],
         repo_source=row["github_repo_source"],
-        languages=_list(row["github_languages"]),
         stars=row["github_stars"] or 0,
         last_commit=row["github_last_commit"],
         links=[GithubLink.model_validate(link) for link in _structs(row["github_links"]) if link.get("url")],

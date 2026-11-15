@@ -165,7 +165,7 @@ def _github_filters(f: AddonFilters, add: _Add) -> None:
 
 def _language_filters(f: AddonFilters, add: _Add) -> None:
     if f.language is not None:
-        add("(list_contains(list_transform(github_languages, lambda x: lower(x)), lower(?))"
+        add("(list_contains(list_transform(github_language_bytes, lambda x: lower(x.name)), lower(?))"
             " OR lower(github_primary_language) = lower(?)"
             " OR list_contains(list_transform(package.language_bytes, lambda x: lower(x.name)), lower(?)))",
             f.language, f.language, f.language)

@@ -279,7 +279,7 @@ def github(user: str, repo: str, *, stars: int = 0, last_commit: str | None = "2
         "size_kb": 100, "topics": topics or [], "repo_description": f"{repo} repository", "homepage": None,
         "archived": archived, "pushed_at": last_commit, "created_at": "2020-01-01T00:00:00",
         "primary_language": (languages or ["Python"])[0],
-        "language_bytes": [{"name": (languages or ["Python"])[0], "bytes": 1000}],
+        "language_bytes": [{"name": name, "bytes": 1000 // (i + 1)} for i, name in enumerate(languages or ["Python"])],
         "manifest": manifest, "manifest_path": "manifest.json" if manifest else None,
         "dependencies": ["requests"] if manifest else [], "readme": readme,
         "ai_tooling_markers": ai_tooling or [], "fork_source": fork_source,

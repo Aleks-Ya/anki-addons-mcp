@@ -99,7 +99,7 @@ def _language_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
     if f.language is not None:
         language = f.language.lower()
         gh = d.github
-        in_github = gh is not None and (language in [x.lower() for x in gh.languages]
+        in_github = gh is not None and (language in [lb.name.lower() for lb in gh.language_bytes]
                                         or _lower(gh.primary_language) == language)
         in_package = d.package is not None and language in [lb.name.lower() for lb in d.package.language_bytes]
         checks.append(in_github or in_package)

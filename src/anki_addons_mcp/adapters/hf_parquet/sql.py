@@ -95,7 +95,7 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
       "unknown (always in snapshots before 2026-11-01)")),
     ("github_fork_source", "github.fork_source",
      "VARCHAR, root repo (owner/repo) of the GitHub fork network when the repo is a GitHub fork"),
-    ("github_languages", "github.languages", "VARCHAR[]"),
+    ("github_languages", "github.languages", "VARCHAR[], the names of github_language_bytes, most bytes first"),
     ("github_stars", "github.stars", "BIGINT"),
     ("github_last_commit", "github.last_commit", _ISO_TIMESTAMP),
     ("github_links", "github.links", "STRUCT(url, user, repo)[]"),
