@@ -18,6 +18,9 @@ see [Dataset notes](dataset-notes.md).
 | `list_addons_by_author` | List the addons of a GitHub user, or of an AnkiWeb author by `author_id` or by any of their addons (`addon_id`) |
 | `top_addons` | Leaderboard by rating, likes, stars, forum posts or recency, optionally within one AI tag |
 
+These tools return compact addon cards. A card's `primary_language` is the main programming language of the newest
+package, else of the GitHub repo.
+
 ### Inspect one addon
 
 | Tool | Use it to |

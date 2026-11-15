@@ -394,6 +394,9 @@ class AddonCard(BaseModel):
     github_archived: bool | None = None
     license: str | None = Field(default=None, description=LICENSE_DESCRIPTION)
     license_source: str | None = Field(default=None, description=LICENSE_SOURCE_DESCRIPTION)
+    primary_language: str | None = Field(
+        default=None, description="Main programming language: of the newest package (data formats such as JSON "
+                                  "excluded), else of the GitHub repo; GitHub Linguist names such as Python")
     forum_posts_count: int | None = None
     ai_tags: list[str] = Field(default_factory=list, description=AI_PROVENANCE)
     author_id: int | None = Field(default=None, description=AUTHOR_ID_DESCRIPTION)
@@ -429,6 +432,8 @@ class AddonCard(BaseModel):
             github_archived=github.archived if github else None,
             license=details.license.spdx_id if details.license else None,
             license_source=details.license.source if details.license else None,
+            primary_language=(details.package.primary_language if details.package else None)
+            or (github.primary_language if github else None),
             forum_posts_count=details.forum.posts_count if details.forum else None,
             ai_tags=list(details.ai.tags) if details.ai else [],
             author_id=details.author.id if details.author else None,

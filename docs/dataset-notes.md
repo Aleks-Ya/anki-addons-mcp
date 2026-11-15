@@ -30,7 +30,7 @@ Snapshots are monthly, and older ones lack data that was added to the dataset la
 
 | Data | Missing in | Affects |
 |---|---|---|
-| `.ankiaddon` packages | snapshots before 2026-11-01 | `get_addon_packages` (empty), package languages |
+| `.ankiaddon` packages | snapshots before 2026-11-01 | `get_addon_packages` (empty), package languages; card `primary_language` falls back to the GitHub repo's |
 | GitHub activity (commits per week, contributors, issue and PR counts, response time, releases) | snapshots before 2026-11-01 | `get_addon`, `assess_maintenance` signals |
 | Anki release dates | snapshots before 2026-11-01, most versions before 2.1.22 | `list_anki_versions` |
 | Anki releases list | snapshots collected before the dataset published it | `list_anki_versions` (empty) |

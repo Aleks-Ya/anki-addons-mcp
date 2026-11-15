@@ -316,7 +316,7 @@ def latest_records() -> list[dict[str, Any]]:
               description="Hide parts of an image to create occlusion cards for anatomy.",
               ai_summary="Creates image occlusion cards.", ai_tags=["image-occlusion", "card-creation"],
               github=github("bob", "image-occlusion", stars=500, tests=40, actions=3, license="GPL-3.0",
-                            languages=["Python", "JavaScript"], topics=["image", "occlusion"],
+                            languages=["JavaScript", "Python"], topics=["image", "occlusion"],
                             manifest=_manifest(66, -250900), readme="# Image Occlusion\nOcclude images."),
               forum=forum(22, 120, topic_source="ai")),
         addon(HEATMAP, "Review Heatmap", rating=84, likes=82, dislikes=2, update_date="2024-01-10",

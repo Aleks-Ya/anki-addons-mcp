@@ -5,7 +5,7 @@ import pytest
 from anki_addons_mcp.adapters.hf_parquet.repository import DuckDbAddonRepository
 from anki_addons_mcp.domain.errors import InvalidQuery
 from anki_addons_mcp.domain.ports import SqlQueryable
-from tests.fixtures.dataset import KANJI, LEGACY, NEW_ADDON, OLD
+from tests.fixtures.dataset import KANJI, LEGACY, NEW_ADDON, OCCLUSION, OLD
 
 
 def test_is_sql_queryable(duckdb_repository: DuckDbAddonRepository) -> None:
@@ -85,6 +85,15 @@ def test_packages_table(duckdb_repository: DuckDbAddonRepository) -> None:
     old = duckdb_repository.execute_readonly("SELECT count(*), count(license), count(clamav_signatures) FROM packages",
                                              OLD, 10, 5)
     assert old.rows == [[0, 0, 0]]
+
+
+# The package's language wins; before 2026-11-01 there are no packages, so the GitHub repo's is used.
+@pytest.mark.parametrize(("snapshot", "expected"), [(None, "Python"), (OLD, "JavaScript")])
+def test_primary_language_column(duckdb_repository: DuckDbAddonRepository, snapshot: date | None,
+                                 expected: str) -> None:
+    result = duckdb_repository.execute_readonly(
+        f"SELECT github_primary_language, primary_language FROM addons WHERE id = {OCCLUSION}", snapshot, 10, 5)
+    assert result.rows == [["JavaScript", expected]]
 
 
 # The package struct is null-typed where no addon has a package, and the license columns bind on every snapshot.

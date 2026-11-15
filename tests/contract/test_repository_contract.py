@@ -485,6 +485,17 @@ def test_aggregation_author_number(repository: AddonRepository, snapshot: date, 
     assert repository.get_aggregation(snapshot).author_number == authors
 
 
+def test_card_primary_language(repository: AddonRepository) -> None:
+    def language(addon_id: int, snapshot: date | None = None) -> str | None:
+        query = AddonQuery(filters=AddonFilters(addon_ids=[addon_id]))
+        return repository.find(query, snapshot).items[0].primary_language
+
+    assert language(OCCLUSION) == "Python"  # the package's, over the GitHub repo's JavaScript
+    assert language(HEATMAP) == "Python"  # no package: the GitHub repo's
+    assert language(NO_GITHUB) is None
+    assert language(KANJI, OLD) == "Python"  # no packages before 2026-11-01
+
+
 def test_group_counts(repository: AddonRepository) -> None:
     assert repository.group_counts(GroupField.LICENSE) == {
         "MIT": 5, "GPL-3.0": 1, "AGPL-3.0": 1, NONE_GROUP: 1}

@@ -73,6 +73,9 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
       "language names are GitHub Linguist names such as 'Python', as in github_primary_language; "
       "clamav_signatures, license and license_source as in `packages`; "
       "NULL when the snapshot holds no package of the addon, always in snapshots before 2026-11-01")),
+    ("primary_language", f"coalesce(TRY_CAST(package AS {_PACKAGE_TYPE}).primary_language, github.primary_language)",
+     ("VARCHAR, main programming language: package.primary_language, else github_primary_language; NULL when "
+      "neither is known; packages exist from 2026-11-01 on")),
     ("license", "license.spdx_id",
      ("VARCHAR, the addon's license as an SPDX id (MIT, GPL-3.0, ...) from the first source naming one; NULL when "
       "none does, which is not proof of no license")),
