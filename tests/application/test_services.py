@@ -376,7 +376,7 @@ def test_statistics(services: Services) -> None:
     assert stats.snapshot == LATEST
     assert stats.aggregation.addon_number == 8
     assert stats.groups[0].distinct_values == 4
-    assert stats.groups[0].counts == {"MIT": 4, "(none)": 2}
+    assert stats.groups[0].counts == {"MIT": 5, "(none)": 1}
 
 
 def test_sql_disabled_for_memory(services: Services) -> None:

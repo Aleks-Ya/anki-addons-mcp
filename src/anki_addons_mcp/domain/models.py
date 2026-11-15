@@ -18,6 +18,20 @@ DUPLICATE_DESCRIPTION = ("Duplicates: listings whose newest packages are byte-id
 SHARED_REPO_DESCRIPTION = ("All repo-level fields (stars, issues, commits, releases, ...) repeat across these addons: "
                            "count each repo once before summing them.")
 GITHUB_ACTIVITY_NULL = "Null in snapshots before 2026-11-01 and when GitHub gave no answer at collection time."
+LICENSE_DESCRIPTION = ("The addon's license as an SPDX id (MIT, GPL-3.0, ...), from the first source that names one; "
+                       "null when none does, which is not proof that the addon has no license")
+LICENSE_SOURCE_DESCRIPTION = (
+    "Where the license comes from, strongest first: 'package_file' (license file in the package), 'github' (the "
+    "repo's license), 'package_header' (license headers of the package's .py files; many copy Anki's AGPL header), "
+    "'readme' (License section of the README), 'description' (named in the AnkiWeb description, possibly a library's). "
+    "Snapshots before 2026-11-01 have no package sources")
+PACKAGE_LICENSE_DESCRIPTION = ("The package's own license as an SPDX id; may differ from the GitHub repo's, as the repo "
+                               "and the uploaded package are separate")
+PACKAGE_LICENSE_SOURCE_DESCRIPTION = ("'file' (license file at the package root) or 'header' (license most root .py "
+                                      "files declare; weaker: many copy Anki's AGPL header)")
+CLAMAV_DESCRIPTION = ("ClamAV signatures the package matched: [] when clean, null when not scanned. A match is not "
+                      "proof of malware, and ClamAV rarely detects malicious Python, so [] does not mean the code is "
+                      "safe")
 _Z = 1.96
 
 
@@ -167,7 +181,10 @@ class GithubInfo(BaseModel):
     links: list[GithubLink] = Field(default_factory=list)
     action_count: int | None = None
     tests_count: int | None = None
-    license: str | None = None
+    license: str | None = Field(
+        default=None, description="SPDX id GitHub detects in the repo; 'NOASSERTION' when the repo has a license file "
+                                  "GitHub cannot identify; null without one. The addon's license is the top-level "
+                                  "license")
     fork_count: int | None = Field(default=None, description="GitHub fork count of the repo; unrelated to forks and "
                                                              "forked_from")
     open_issues: int | None = Field(
@@ -274,6 +291,12 @@ class AuthorInfo(BaseModel):
     addon_count: int = Field(description="Number of the author's addons in the snapshot")
 
 
+class AddonLicense(BaseModel):
+    spdx_id: str = Field(description="SPDX id as GitHub names it, e.g. MIT, GPL-3.0, AGPL-3.0")
+    source: str | None = Field(
+        default=None, description=LICENSE_SOURCE_DESCRIPTION)
+
+
 class PackageSummary(BaseModel):
     file_name: str
     updated: str | None = None
@@ -288,6 +311,9 @@ class PackageSummary(BaseModel):
     language_bytes: list[LanguageBytes] = Field(
         default_factory=list, description="Bytes per language detected in the package, most first; "
                                           "GitHub Linguist names such as Python")
+    clamav_signatures: list[str] | None = Field(default=None, description=CLAMAV_DESCRIPTION)
+    license: str | None = Field(default=None, description=PACKAGE_LICENSE_DESCRIPTION)
+    license_source: str | None = Field(default=None, description=PACKAGE_LICENSE_SOURCE_DESCRIPTION)
 
 
 class AddonPackage(BaseModel):
@@ -309,6 +335,14 @@ class AddonPackage(BaseModel):
     language_bytes: list[LanguageBytes] = Field(
         default_factory=list, description="Bytes per language detected in the package, most first; "
                                           "GitHub Linguist names such as Python")
+    clamav_signatures: list[str] | None = Field(default=None, description=CLAMAV_DESCRIPTION)
+    clamav_database_version: int | None = Field(default=None, description="ClamAV signature database version of the "
+                                                                          "scan; null when not scanned")
+    license: str | None = Field(default=None, description=PACKAGE_LICENSE_DESCRIPTION)
+    license_source: str | None = Field(default=None, description=PACKAGE_LICENSE_SOURCE_DESCRIPTION)
+    license_file: str | None = Field(
+        default=None, description="License file at the package root, also when its text is not recognized "
+                                  "(a proprietary or uncommon license)")
     download_url: str | None = Field(
         default=None, description="Where the .ankiaddon file can be downloaded; null when the server reads a local "
                                   "dataset. The file stays under its author's license, not the dataset's CC0")
@@ -332,6 +366,7 @@ class AddonDetails(BaseModel):
         default=None, description="The package of the branch with the highest minimum Anki version; "
                                   "get_addon_packages lists all branches. Null when the snapshot holds no package of "
                                   "the addon, always in snapshots before 2026-11-01")
+    license: AddonLicense | None = Field(default=None, description=LICENSE_DESCRIPTION)
     description: str | None = None
     description_html: str | None = None
     readme: str | None = None
@@ -357,7 +392,8 @@ class AddonCard(BaseModel):
     github_stars: int | None = None
     github_last_commit: str | None = None
     github_archived: bool | None = None
-    license: str | None = None
+    license: str | None = Field(default=None, description=LICENSE_DESCRIPTION)
+    license_source: str | None = Field(default=None, description=LICENSE_SOURCE_DESCRIPTION)
     forum_posts_count: int | None = None
     ai_tags: list[str] = Field(default_factory=list, description=AI_PROVENANCE)
     author_id: int | None = Field(default=None, description=AUTHOR_ID_DESCRIPTION)
@@ -391,7 +427,8 @@ class AddonCard(BaseModel):
             github_stars=github.stars if github else None,
             github_last_commit=github.last_commit if github else None,
             github_archived=github.archived if github else None,
-            license=github.license if github else None,
+            license=details.license.spdx_id if details.license else None,
+            license_source=details.license.source if details.license else None,
             forum_posts_count=details.forum.posts_count if details.forum else None,
             ai_tags=list(details.ai.tags) if details.ai else [],
             author_id=details.author.id if details.author else None,

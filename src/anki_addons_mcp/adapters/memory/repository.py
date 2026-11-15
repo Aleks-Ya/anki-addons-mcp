@@ -166,7 +166,7 @@ def _sort_value(d: AddonDetails, field: SortField, score: float | None) -> Any:
 
 
 _GROUP_VALUES: dict[GroupField, Callable[[AddonDetails], list[str | None]]] = {
-    GroupField.LICENSE: lambda d: [d.github.license if d.github else None],
+    GroupField.LICENSE: lambda d: [d.license.spdx_id if d.license else None],
     GroupField.PRIMARY_LANGUAGE: lambda d: [d.github.primary_language if d.github else None],
     GroupField.PACKAGE_LANGUAGE: lambda d: [d.package.primary_language if d.package else None],
     GroupField.DESCRIPTION_LANGUAGE: lambda d: [d.anki_web.description_language],

@@ -15,9 +15,9 @@ def test_is_sql_queryable(duckdb_repository: DuckDbAddonRepository) -> None:
 
 def test_select(duckdb_repository: DuckDbAddonRepository) -> None:
     result = duckdb_repository.execute_readonly(
-        "WITH t AS (SELECT * FROM addons WHERE has_github) SELECT github_license, count(*) AS n FROM t "
+        "WITH t AS (SELECT * FROM addons WHERE has_github) SELECT license, count(*) AS n FROM t "
         "GROUP BY 1 ORDER BY n DESC, 1 LIMIT 1", None, 10, 5)
-    assert result.columns == ["github_license", "n"]
+    assert result.columns == ["license", "n"]
     assert result.rows == [["MIT", 4]]
     assert not result.truncated
 
@@ -75,9 +75,27 @@ def test_packages_table(duckdb_repository: DuckDbAddonRepository) -> None:
     columns = duckdb_repository.execute_readonly("SELECT * FROM packages LIMIT 1", None, 10, 5).columns
     assert columns == ["addon_id", "file_name", "min_point_version", "updated", "size_bytes", "manifest_json",
                        "config_json", "file_count", "uncompressed_bytes", "python_file_count", "python_lines", "files",
-                       "language_bytes"]
-    old = duckdb_repository.execute_readonly("SELECT count(*) FROM packages", OLD, 10, 5)
-    assert old.rows == [[0]]
+                       "language_bytes", "clamav_signatures", "clamav_database_version", "license", "license_source",
+                       "license_file"]
+    scanned = duckdb_repository.execute_readonly(
+        "SELECT file_name[:2], clamav_signatures, clamav_database_version, license, license_source, license_file "
+        "FROM packages ORDER BY addon_id, min_point_version", None, 10, 5)
+    assert scanned.rows == [["0-", ["PUA.Win.Packer.Upx-1"], 28183, "MIT", "header", None],
+                            ["25", [], 28183, "MIT", "file", "LICENSE"], ["66", [], 28183, None, None, "LICENSE.txt"]]
+    old = duckdb_repository.execute_readonly("SELECT count(*), count(license), count(clamav_signatures) FROM packages",
+                                             OLD, 10, 5)
+    assert old.rows == [[0, 0, 0]]
+
+
+# The package struct is null-typed where no addon has a package, and the license columns bind on every snapshot.
+@pytest.mark.parametrize(("snapshot", "expected"), [(None, ["MIT", "package_file", [], "MIT", "file"]),
+                                                    (OLD, ["MIT", "readme", None, None, None])])
+def test_license_columns(duckdb_repository: DuckDbAddonRepository, snapshot: date | None,
+                         expected: list[object]) -> None:
+    result = duckdb_repository.execute_readonly(
+        "SELECT license, license_source, package.clamav_signatures, package.license, package.license_source "
+        f"FROM addons WHERE id = {KANJI}", snapshot, 10, 5)
+    assert result.rows == [expected]
 
 
 def test_anki_versions_release_date_column(duckdb_repository: DuckDbAddonRepository) -> None:

@@ -61,8 +61,8 @@ The Space sleeps after inactivity, so the first request can take a while. To hos
 
 - **Find addons**: full-text search and structured filters (rating, GitHub, language, Anki version, AI tags,
   forks, copies, ...), similar addons, addons of an author, leaderboards.
-- **Inspect an addon**: the full record, GitHub README, AnkiWeb description, user reviews, and what its
-  `.ankiaddon` packages really ship.
+- **Inspect an addon**: the full record with its license, GitHub README, AnkiWeb description, user reviews, and
+  what its `.ankiaddon` packages really ship, with their ClamAV scan result.
 - **Check compatibility** of addons with an Anki version, and list the real Anki releases.
 - **Assess maintenance**: activity signals and an active / stale / abandoned label.
 - **Compare forks**: the original, its forks and forks of forks side by side, e.g. to find a maintained fork

@@ -178,8 +178,9 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "The .ankiaddon packages AnkiWeb serves for an addon, one per branch, by minimum Anki version: file name, "
-        "date, size, file and Python line counts (bundled libraries included), bytes per detected language and "
-        "download URL. 'include' adds the "
+        "date, size, file and Python line counts (bundled libraries included), bytes per detected language, the "
+        "package's own license, ClamAV signatures matched (a match is not proof of malware, [] not proof of "
+        "safety) and download URL. 'include' adds the "
         "raw manifest.json and config.json and the list of files. Use it to see what an addon really ships. Empty "
         "for snapshots before 2026-11-01, when packages were not collected. The files stay under their authors' "
         "licenses, not the dataset's CC0."))
@@ -277,7 +278,7 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
     @mcp.tool(annotations=READ_ONLY, description=(
         "Dataset statistics: addon counts (total, with GitHub, with forum topic, with tests), the number of "
         "AnkiWeb authors, and optional "
-        "group-by counts, e.g. by license, language (primary_language of the GitHub repo, or package_language "
+        "group-by counts, e.g. by license (the addon's resolved license), language (primary_language of the GitHub repo, or package_language "
         "detected in the AnkiWeb package, which covers far more addons), AI tag (ai_tag) or Anki version kind "
         "(anki_version_kind)."))
     def get_statistics(group_by: list[GroupField] | None = None,

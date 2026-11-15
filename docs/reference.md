@@ -22,11 +22,11 @@ see [Dataset notes](dataset-notes.md).
 
 | Tool | Use it to |
 |---|---|
-| `get_addon` | Get the full record: AnkiWeb, GitHub (with activity and the addons sharing the repo), forum topic, newest package, AI summary and tags, fork relations, copies; long texts and the release list with `include` |
+| `get_addon` | Get the full record: AnkiWeb, GitHub (with activity and the addons sharing the repo), forum topic, newest package, license, AI summary and tags, fork relations, copies; long texts and the release list with `include` |
 | `get_addon_readme` | Read the GitHub README as markdown |
 | `get_addon_description` | Read the AnkiWeb description as plain text, or the author's HTML with `format=html` |
 | `get_addon_reviews` | Read AnkiWeb reviews newest first, filtered by `vote`, `contains` text and `since` date, e.g. reports of breakage on a new Anki |
-| `get_addon_packages` | See what the `.ankiaddon` packages ship, one per branch: sizes, file and Python line counts, languages, download URL; raw `manifest.json`, `config.json` and the file list with `include` |
+| `get_addon_packages` | See what the `.ankiaddon` packages ship, one per branch: sizes, file and Python line counts, languages, license, ClamAV scan result, download URL; raw `manifest.json`, `config.json` and the file list with `include` |
 
 ### Assess
 
@@ -42,7 +42,7 @@ see [Dataset notes](dataset-notes.md).
 |---|---|
 | `get_addon_history` | Follow one addon's rating, likes, stars, update date and Anki version across snapshots |
 | `diff_snapshots` | See added, removed and updated addons and the biggest rating and star changes between two snapshots |
-| `get_statistics` | Count addons, optionally grouped by license, repo or package language, description language, AI tag, Anki version or its kind, update year, GitHub topic, AI markers |
+| `get_statistics` | Count addons, optionally grouped by license (the resolved one, see [Licenses](dataset-notes.md#licenses)), repo or package language, description language, AI tag, Anki version or its kind, update year, GitHub topic, AI markers |
 
 ### Lookups
 
@@ -127,7 +127,7 @@ repo, and `assess_maintenance` says when its GitHub signals belong to a shared r
 | `anki-addons://addons/{addon_id}/description` | AnkiWeb description as plain text |
 | `anki-addons://addons/{addon_id}/description.html` | AnkiWeb description as the author's HTML (not sanitized) |
 | `anki-addons://addons/{addon_id}/reviews` | The 50 newest AnkiWeb reviews |
-| `anki-addons://addons/{addon_id}/packages` | Sizes, counts and download URLs of the `.ankiaddon` packages |
+| `anki-addons://addons/{addon_id}/packages` | Sizes, counts, licenses, ClamAV results and download URLs of the `.ankiaddon` packages |
 | `anki-addons://addons/{addon_id}/history` | Rating, likes and stars across snapshots |
 | `anki-addons://authors/{github_user}` | Addons of a GitHub user |
 | `anki-addons://tags` | AI tag vocabulary with descriptions and addon counts |

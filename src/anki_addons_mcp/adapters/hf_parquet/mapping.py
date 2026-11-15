@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from anki_addons_mcp.domain.models import (
     AddonCard,
     AddonDetails,
+    AddonLicense,
     AiInfo,
     AnkiWebInfo,
     AnkiWebLink,
@@ -27,8 +28,8 @@ from anki_addons_mcp.domain.models import (
 CARD_COLUMNS = [
     "id", "title", "url", "rating", "likes", "dislikes", "update_date", "anki_version", "anki_point_version",
     "anki_version_kind", "ai_summary",
-    "github_user", "github_repo", "github_stars", "github_last_commit", "github_archived", "github_license",
-    "forum_posts_count", "ai_tags", "author_id",
+    "github_user", "github_repo", "github_stars", "github_last_commit", "github_archived", "license",
+    "license_source", "forum_posts_count", "ai_tags", "author_id",
     "forked_from", "forks", "duplicate_of", "duplicates",
 ]
 
@@ -64,7 +65,8 @@ def row_to_card(row: dict[str, Any], score: float | None = None) -> AddonCard:
         anki_version_kind=row["anki_version_kind"] or VersionKind.UNKNOWN, ai_summary=row["ai_summary"],
         github_user=row["github_user"], github_repo=row["github_repo"], github_stars=row["github_stars"],
         github_last_commit=row["github_last_commit"], github_archived=row["github_archived"],
-        license=row["github_license"], forum_posts_count=row["forum_posts_count"], ai_tags=_list(row["ai_tags"]),
+        license=row["license"], license_source=row["license_source"], forum_posts_count=row["forum_posts_count"],
+        ai_tags=_list(row["ai_tags"]),
         author_id=row["author_id"], forked_from=row["forked_from"]["id"] if row["forked_from"] else None,
         forks=_list(row["forks"]), duplicate_of=row["duplicate_of"]["id"] if row["duplicate_of"] else None,
         duplicates=_list(row["duplicates"]), score=score,
@@ -172,6 +174,7 @@ def row_to_details(row: dict[str, Any]) -> AddonDetails:
     forked_from = ForkRelation.model_validate(row["forked_from"]) if row["forked_from"] else None
     duplicate_of = DuplicateRelation.model_validate(row["duplicate_of"]) if row["duplicate_of"] else None
     package = PackageSummary.model_validate(row["package"]) if row["package"] else None
+    license_ = AddonLicense(spdx_id=row["license"], source=row["license_source"]) if row["license"] else None
     return AddonDetails(id=row["id"], anki_web=anki_web, github=github, forum=_forum(row), ai=ai, author=_author(row),
                         forked_from=forked_from, forks=_list(row["forks"]), duplicate_of=duplicate_of,
-                        duplicates=_list(row["duplicates"]), package=package)
+                        duplicates=_list(row["duplicates"]), package=package, license=license_)

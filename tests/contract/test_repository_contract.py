@@ -7,6 +7,7 @@ from anki_addons_mcp.adapters.memory.repository import InMemoryAddonRepository
 from anki_addons_mcp.domain.errors import InvalidQuery, SnapshotNotFound
 from anki_addons_mcp.domain.models import (
     NONE_GROUP,
+    AddonLicense,
     DuplicateEvidence,
     ForkEvidence,
     GroupField,
@@ -172,6 +173,8 @@ def test_package_summary_is_the_newest_branch(repository: AddonRepository) -> No
     assert kanji.package.updated == "2026-09-20"
     assert kanji.package.primary_language == "Python"
     assert kanji.package.language_bytes == newest.language_bytes
+    assert (kanji.package.clamav_signatures, kanji.package.license, kanji.package.license_source) == ([], "MIT",
+                                                                                                     "file")
     assert no_package.package is None
     assert no_package.anki_web.package_size_kb == 10
     without_size = repository.get_addon(NO_GITHUB)
@@ -191,6 +194,18 @@ def test_list_packages(repository: AddonRepository) -> None:
 def test_anki_release_dates(repository: AddonRepository) -> None:
     assert repository.list_anki_versions() == ANKI_VERSIONS
     assert repository.list_anki_versions()[-1].release_date is None
+
+
+def test_addon_license(repository: AddonRepository) -> None:
+    kanji, occlusion, legacy = repository.get_addons([KANJI, OCCLUSION, LEGACY])
+    assert kanji.license == AddonLicense(spdx_id="MIT", source="package_file")
+    assert kanji.github is not None
+    assert kanji.github.license == "NOASSERTION"
+    assert occlusion.license == AddonLicense(spdx_id="GPL-3.0", source="github")
+    assert legacy.license is None
+    old_kanji = repository.get_addon(KANJI, OLD)
+    assert old_kanji is not None
+    assert old_kanji.license == AddonLicense(spdx_id="MIT", source="readme")
 
 
 def test_get_addon_missing(repository: AddonRepository) -> None:
@@ -415,7 +430,7 @@ def test_card_fields(repository: AddonRepository) -> None:
     assert card.title == "Kanji Helper"
     assert card.github_user == "alice"
     assert card.github_stars == 50
-    assert card.license == "MIT"
+    assert (card.license, card.license_source) == ("MIT", "package_file")
     assert card.forum_posts_count == 30
     assert "ai_model" not in card.model_dump()
     no_github = repository.find(AddonQuery(filters=AddonFilters(addon_ids=[NO_GITHUB]))).items[0]
@@ -472,7 +487,7 @@ def test_aggregation_author_number(repository: AddonRepository, snapshot: date, 
 
 def test_group_counts(repository: AddonRepository) -> None:
     assert repository.group_counts(GroupField.LICENSE) == {
-        "MIT": 4, "GPL-3.0": 1, "AGPL-3.0": 1, NONE_GROUP: 2}
+        "MIT": 5, "GPL-3.0": 1, "AGPL-3.0": 1, NONE_GROUP: 1}
     topics = repository.group_counts(GroupField.GITHUB_TOPIC)
     assert topics["kanji"] == 2
     assert topics[NONE_GROUP] == 2

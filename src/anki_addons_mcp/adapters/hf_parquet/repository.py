@@ -80,7 +80,7 @@ _SORT_EXPR = {
 }
 
 _SCALAR_GROUPS = {
-    GroupField.LICENSE: "github_license",
+    GroupField.LICENSE: "license",
     GroupField.PRIMARY_LANGUAGE: "github_primary_language",
     GroupField.PACKAGE_LANGUAGE: "package.primary_language",
     GroupField.DESCRIPTION_LANGUAGE: "description_language",

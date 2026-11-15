@@ -12,7 +12,8 @@ _UNTRACKED = "; NULL in snapshots before 2026-11-01 and when GitHub gave no answ
 # Explicit types: these fields are null-typed in snapshots before 2026-11-01, and SQL over them must bind on every one.
 _PACKAGE_TYPE = ("STRUCT(file_name VARCHAR, updated VARCHAR, size_bytes BIGINT, file_count BIGINT, "
                  "uncompressed_bytes BIGINT, python_file_count BIGINT, python_lines BIGINT, primary_language VARCHAR, "
-                 "language_bytes STRUCT(name VARCHAR, bytes BIGINT)[])")
+                 "language_bytes STRUCT(name VARCHAR, bytes BIGINT)[], clamav_signatures VARCHAR[], license VARCHAR, "
+                 "license_source VARCHAR)")
 _RELEASES_TYPE = ("STRUCT(tag_name VARCHAR, name VARCHAR, published_at VARCHAR, prerelease BOOLEAN, "
                   "assets STRUCT(name VARCHAR, size BIGINT, download_count BIGINT)[])[]")
 _CONTRIBUTORS_TYPE = "STRUCT(login VARCHAR, contributions BIGINT)[]"
@@ -70,7 +71,14 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
      (f"{_PACKAGE_TYPE}, the .ankiaddon package of the branch with the highest min_point_version (see `packages`); "
       "primary_language is the language with the most bytes, ignoring data formats such as JSON, CSV or YAML; "
       "language names are GitHub Linguist names such as 'Python', as in github_primary_language; "
+      "clamav_signatures, license and license_source as in `packages`; "
       "NULL when the snapshot holds no package of the addon, always in snapshots before 2026-11-01")),
+    ("license", "license.spdx_id",
+     ("VARCHAR, the addon's license as an SPDX id (MIT, GPL-3.0, ...) from the first source naming one; NULL when "
+      "none does, which is not proof of no license")),
+    ("license_source", "license.source",
+     ("VARCHAR, where license comes from, strongest first: 'package_file', 'github', 'package_header' (.py headers; "
+      "many copy Anki's AGPL header), 'readme', 'description'; no package sources before 2026-11-01")),
     ("has_github", "github IS NOT NULL", "BOOLEAN"),
     ("github_user", "github.user", "VARCHAR"),
     ("github_repo", "github.repo", "VARCHAR"),
@@ -90,7 +98,9 @@ FLAT_COLUMNS: list[tuple[str, str, str]] = [
     ("github_links", "github.links", "STRUCT(url, user, repo)[]"),
     ("github_action_count", "github.action_count", "BIGINT, GitHub Actions workflows"),
     ("github_tests_count", "github.tests_count", "BIGINT, test files"),
-    ("github_license", "github.license", "VARCHAR, SPDX id"),
+    ("github_license", "github.license",
+     ("VARCHAR, SPDX id GitHub detects in the repo; 'NOASSERTION' for a license file GitHub cannot identify; "
+      "the addon's license is the license column")),
     ("github_fork_count", "github.fork_count", "BIGINT, GitHub fork count of the repo; unrelated to forks/forked_from"),
     ("github_open_issues", "github.open_issues",
      "BIGINT, open issues and open pull requests together; see github_open_issue_count, github_open_pr_count"),
@@ -208,6 +218,13 @@ PACKAGE_COLUMNS: list[tuple[str, str]] = [
     ("python_lines", "BIGINT, lines of .py files up to 5 MB, comments and blank lines included"),
     ("files", "VARCHAR[], the paths in the package"),
     ("language_bytes", "STRUCT(name, bytes)[], bytes per detected language, most first; Linguist names, e.g. 'Python'"),
+    ("clamav_signatures",
+     ("VARCHAR[], ClamAV signatures matched: [] when clean, NULL when not scanned; a match is not proof of malware, "
+      "and [] does not mean the code is safe")),
+    ("clamav_database_version", "BIGINT, ClamAV signature database version of the scan"),
+    ("license", "VARCHAR, the package's own SPDX license; may differ from the GitHub repo's"),
+    ("license_source", "VARCHAR, 'file' (root license file) or 'header' (root .py headers; weaker)"),
+    ("license_file", "VARCHAR, root license file name, also when its text is not recognized"),
 ]
 _DENIED_FUNCTIONS = frozenset({"getenv", "current_setting"})
 

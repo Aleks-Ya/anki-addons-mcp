@@ -78,24 +78,33 @@ def _languages(**byte_counts: int) -> list[LanguageBytes]:
     return [LanguageBytes(name=name, bytes=count) for name, count in byte_counts.items()]
 
 
+def _sha(char: str) -> str:
+    return char * 64
+
+
+CLAMAV_DB = 28183
 # Sorted by addon and minimum Anki version, as published. Only the LATEST snapshot holds packages.
-# KANJI's newest package ships Handlebars, which its GitHub repo does not list.
+# KANJI's newest package ships Handlebars, which its GitHub repo does not list, and a license file GitHub cannot
+# identify in the repo; its old package matched a ClamAV signature.
 LATEST_PACKAGES: dict[int, list[AddonPackage]] = {
     KANJI: [
-        AddonPackage(file_name="0-2021-03-01-aaaaaaaaaaaa.ankiaddon", min_point_version=0, updated=date(2021, 3, 1),
+        AddonPackage(file_name=f"0-2021-03-01-{_sha('a')}.ankiaddon", min_point_version=0, updated=date(2021, 3, 1),
                      size_bytes=5000, config_json='{"font": "serif"}', file_count=2, uncompressed_bytes=12000,
                      python_file_count=1, python_lines=120, files=["__init__.py", "config.json"],
-                     language_bytes=_languages(Python=3000, JSON=20)),
-        AddonPackage(file_name="250200-2026-09-20-bbbbbbbbbbbb.ankiaddon", min_point_version=250200,
+                     language_bytes=_languages(Python=3000, JSON=20), clamav_signatures=["PUA.Win.Packer.Upx-1"],
+                     clamav_database_version=CLAMAV_DB, license="MIT", license_source="header"),
+        AddonPackage(file_name=f"250200-2026-09-20-{_sha('b')}.ankiaddon", min_point_version=250200,
                      updated=date(2026, 9, 20), size_bytes=9000, manifest_json='{"name": "Kanji Helper"}',
                      config_json='{"font": "sans"}', file_count=3, uncompressed_bytes=30000, python_file_count=2,
                      python_lines=450, files=["__init__.py", "manifest.json", "lib/strokes.py"],
-                     language_bytes=_languages(JSON=12000, Python=9000, Handlebars=300)),
+                     language_bytes=_languages(JSON=12000, Python=9000, Handlebars=300), clamav_signatures=[],
+                     clamav_database_version=CLAMAV_DB, license="MIT", license_source="file", license_file="LICENSE"),
     ],
     OCCLUSION: [
-        AddonPackage(file_name="66-2026-08-01-cccccccccccc.ankiaddon", min_point_version=66, updated=date(2026, 8, 1),
+        AddonPackage(file_name=f"66-2026-08-01-{_sha('c')}.ankiaddon", min_point_version=66, updated=date(2026, 8, 1),
                      size_bytes=70000, file_count=1, uncompressed_bytes=90000, python_file_count=1, python_lines=900,
-                     files=["__init__.py"], language_bytes=_languages(Python=60000, JavaScript=20000)),
+                     files=["__init__.py"], language_bytes=_languages(Python=60000, JavaScript=20000),
+                     clamav_signatures=[], clamav_database_version=CLAMAV_DB, license_file="LICENSE.txt"),
     ],
 }
 _PACKAGE_SCHEMA = pa.schema([
@@ -104,6 +113,8 @@ _PACKAGE_SCHEMA = pa.schema([
     ("file_count", pa.int64()), ("uncompressed_bytes", pa.int64()), ("python_file_count", pa.int64()),
     ("python_lines", pa.int64()), ("files", pa.list_(pa.string())),
     ("language_bytes", pa.list_(pa.struct([("name", pa.string()), ("bytes", pa.int64())]))),
+    ("clamav_signatures", pa.list_(pa.string())), ("clamav_database_version", pa.int64()), ("license", pa.string()),
+    ("license_source", pa.string()), ("license_file", pa.string()),
 ])
 _DATA_LANGUAGES = {"JSON", "CSV", "YAML"}
 
@@ -122,7 +133,9 @@ def _package_summary(addon_id: int) -> dict[str, Any] | None:
             "uncompressed_bytes": newest.uncompressed_bytes, "python_file_count": newest.python_file_count,
             "python_lines": newest.python_lines,
             "primary_language": next((lb.name for lb in newest.language_bytes if lb.name not in _DATA_LANGUAGES), None),
-            "language_bytes": [lb.model_dump() for lb in newest.language_bytes]}
+            "language_bytes": [lb.model_dump() for lb in newest.language_bytes],
+            "clamav_signatures": newest.clamav_signatures, "license": newest.license,
+            "license_source": newest.license_source}
 
 
 def reviews_at(snapshot: date) -> dict[int, list[AddonReview]]:
@@ -164,8 +177,10 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
           ai_summary: str | None = None, ai_tags: list[str] | None = None,
           author_addons: list[int] | None = None,
           forked_from: tuple[int, str] | None = None, duplicate_of: tuple[int, str] | None = None,
-          package_size_kb: int | None = 10) -> dict[str, Any]:
+          package_size_kb: int | None = 10, license: tuple[str, str] | None = None) -> dict[str, Any]:
     point_version, version_kind = _addons_list_version(anki_version)
+    if license is None and github and github["license"] not in (None, "NOASSERTION"):
+        license = (github["license"], "github")
     group = author_addons or [addon_id]
     return {
         "id": addon_id,
@@ -202,6 +217,7 @@ def addon(addon_id: int, title: str, *, rating: int = 0, likes: int = 0, dislike
         "duplicate_of": {"id": duplicate_of[0], "evidence": duplicate_of[1]} if duplicate_of else None,
         "duplicates": [],
         "package": _package_summary(addon_id),
+        "license": {"spdx_id": license[0], "source": license[1]} if license else None,
     }
 
 
@@ -289,7 +305,9 @@ def latest_records() -> list[dict[str, Any]]:
               author_addons=ALICE_ADDONS,
               ai_summary="Shows kanji stroke order and readings during review.",
               ai_tags=["dictionary", "card-templates", "mobile-compatible"],
-              github=github("alice", "kanji-helper", stars=50, tests=12, actions=2, topics=["japanese", "kanji"],
+              license=("MIT", "package_file"),
+              github=github("alice", "kanji-helper", stars=50, tests=12, actions=2, license="NOASSERTION",
+                            topics=["japanese", "kanji"],
                             manifest=_manifest(231000, None), readme="# Kanji Helper\nStroke order for kanji.",
                             activity=KANJI_ACTIVITY, shared_with=[SAME_AUTHOR], repo_sharing="same_author"),
               forum=forum(11, 30)),
@@ -315,7 +333,8 @@ def latest_records() -> list[dict[str, Any]]:
         addon(NO_GITHUB, "Simple Timer", rating=15, likes=15, update_date="2025-11-11", anki_version="",
               branches=[("2.1.50", "+")], description="A timer for review sessions. Zeitmesser.", lang="de",
               author_addons=ALICE_ADDONS, package_size_kb=None,
-              ai_tags=["timer"], forked_from=(KANJI, "ai"), duplicate_of=(KANJI, "same_package")),
+              ai_tags=["timer"], forked_from=(KANJI, "ai"), duplicate_of=(KANJI, "same_package"),
+              license=("MIT", "description")),
         addon(VIBE, "Vibe Deck Tools", rating=4, likes=3, dislikes=1, update_date="2026-09-29",
               anki_version="25.09~", branches=[("25.09", "+")], description="Deck tools vibe-coded with claude.",
               ai_declaration=["claude", "vibe-coded"], ai_tags=["deck-management", "beta"],
@@ -343,6 +362,8 @@ def old_records() -> list[dict[str, Any]]:
     by_id[KANJI]["anki_web"]["update_date"] = "2026-06-01"
     by_id[KANJI]["github"]["stars"] = 40
     by_id[OCCLUSION]["github"]["stars"] = 450
+    # Before packages, the license comes from GitHub, the README or the description only.
+    by_id[KANJI]["license"] = {"spdx_id": "MIT", "source": "readme"}
     by_id[REMOVED] = addon(REMOVED, "Gone Addon", rating=7, likes=7, update_date="2022-02-02",
                            description="Will be removed.")
     for record in by_id.values():
