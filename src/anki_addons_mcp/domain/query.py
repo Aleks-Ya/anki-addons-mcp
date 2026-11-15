@@ -1,7 +1,7 @@
 from datetime import date
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from anki_addons_mcp.domain.models import ReviewVote, VersionKind
 
@@ -25,7 +25,7 @@ class AddonFilters(BaseModel):
     has_github: bool | None = None
     has_tests: bool | None = None
     has_forum: bool | None = None
-    language: str | None = None
+    language: list[str] | None = None
     primary_language: str | None = None
     description_language: str | None = None
     github_user: str | None = None
@@ -46,6 +46,11 @@ class AddonFilters(BaseModel):
     anki_version_at_least: str | None = None
     tags: list[str] | None = None
     exclude_tags: list[str] | None = None
+
+    @field_validator("language", mode="before")
+    @classmethod
+    def _one_language_as_list(cls, value: object) -> object:
+        return [value] if isinstance(value, str) else value
 
 
 class AddonQuery(BaseModel):

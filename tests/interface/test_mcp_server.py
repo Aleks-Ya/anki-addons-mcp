@@ -93,6 +93,32 @@ async def test_filter(client: Client) -> None:
     assert page["total"] == 2
 
 
+async def test_filter_by_several_languages(client: Client) -> None:
+    both = await call(client, "filter_addons", language=["python", "JavaScript"])
+    assert [item["id"] for item in both["items"]] == [OCCLUSION]
+    one = await call(client, "filter_addons", language="handlebars")
+    assert [item["id"] for item in one["items"]] == [KANJI]
+    searched = await call(client, "search_addons", query="kanji", language=["Python", "Handlebars"])
+    assert [item["id"] for item in searched["items"]] == [KANJI]
+    none = await call(client, "filter_addons", language=["JavaScript", "Handlebars"])
+    assert none["total"] == 0
+
+
+async def test_language_parameter_accepts_a_name_or_a_list(client: Client) -> None:
+    for tool in (await client.list_tools()).tools:
+        if tool.name in {"search_addons", "filter_addons"}:
+            types = {option.get("type") for option in tool.input_schema["properties"]["language"]["anyOf"]}
+            assert {"string", "array"} <= types, tool.name
+
+
+async def test_statistics_by_contained_language(client: Client) -> None:
+    stats = await call(client, "get_statistics", group_by=["language"])
+    group = stats["groups"][0]
+    assert group["field"] == "language"
+    assert group["counts"] == {"Python": 7, "Handlebars": 1, "JSON": 1, "JavaScript": 1, "(none)": 1}
+    assert group["distinct_values"] == 5
+
+
 async def test_filter_by_primary_language(client: Client) -> None:
     anywhere = await call(client, "filter_addons", language="JavaScript")
     assert [item["id"] for item in anywhere["items"]] == [OCCLUSION]

@@ -376,6 +376,15 @@ class AddonDetails(BaseModel):
         return (self.package.primary_language if self.package else None) or (
             self.github.primary_language if self.github else None)
 
+    def languages(self) -> list[str]:
+        """Every language found in the GitHub repo or the newest package, each once, data formats included."""
+        names: list[str | None] = []
+        if self.github:
+            names += [lb.name for lb in self.github.language_bytes] + [self.github.primary_language]
+        if self.package:
+            names += [lb.name for lb in self.package.language_bytes]
+        return list(dict.fromkeys(name for name in names if name))
+
     def without_texts(self) -> "AddonDetails":
         return self.model_copy(update={"description": None, "description_html": None, "readme": None})
 
@@ -531,6 +540,7 @@ class TextKind(StrEnum):
 
 class GroupField(StrEnum):
     LICENSE = "license"
+    LANGUAGE = "language"
     PRIMARY_LANGUAGE = "primary_language"
     PACKAGE_LANGUAGE = "package_language"
     DESCRIPTION_LANGUAGE = "description_language"

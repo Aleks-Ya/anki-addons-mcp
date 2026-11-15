@@ -47,10 +47,11 @@ Tags = Annotated[list[str] | None, Field(
                 "see list_tags for the vocabulary")]
 ExcludeTags = Annotated[list[str] | None, Field(
     description="AI tags the addon must not have, e.g. ['obsolete', 'no-description', 'paid']")]
-Language = Annotated[str | None, Field(
-    description="Any language of the GitHub repo or found in the AnkiWeb package, bundled libraries and data formats "
-                "included, case-insensitive, e.g. JavaScript; use primary_language for what the addon is mainly "
-                "written in")]
+Language = Annotated[str | list[str] | None, Field(
+    description="Languages the addon must all contain (AND), e.g. ['Python', 'JavaScript'], or one name such as "
+                "'JavaScript'. A language counts when it is found anywhere in the GitHub repo or the AnkiWeb package, "
+                "bundled libraries and data formats included; case-insensitive. Use primary_language for what the "
+                "addon is mainly written in")]
 PrimaryLanguage = Annotated[str | None, Field(
     description="Main programming language, as on the cards: of the newest package, else of the GitHub repo; "
                 "case-insensitive, e.g. Python, JavaScript")]
@@ -113,8 +114,8 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
             return catalog.search(query, limit, offset, filters, parse_snapshot(snapshot))
 
     @mcp.tool(annotations=READ_ONLY, description=(
-        "Structured addon query. All filters are optional and combined with AND. "
-        "Returns addon cards and the total number of matches. sort_by=rating (default) ranks by approval: "
+        "Structured addon query. All filters are optional and combined with AND; the list filters language and "
+        "tags also require all their values. Returns addon cards and the total number of matches. sort_by=rating (default) ranks by approval: "
         "the Wilson lower bound of likes vs. dislikes, so disliked addons rank lower. min_rating is a minimum "
         "number of AnkiWeb votes (likes + dislikes). sort_by=anki_version orders by the newest supported Anki version."))
     def filter_addons(
@@ -283,10 +284,14 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Dataset statistics: addon counts (total, with GitHub, with forum topic, with tests), the number of "
-        "AnkiWeb authors, and optional "
-        "group-by counts, e.g. by license (the addon's resolved license), language (primary_language of the GitHub repo, or package_language "
-        "detected in the AnkiWeb package, which covers far more addons), AI tag (ai_tag) or Anki version kind "
-        "(anki_version_kind)."))
+        "AnkiWeb authors, and optional group-by counts, e.g. by license (the addon's resolved license), language, "
+        "AI tag (ai_tag) or Anki version kind (anki_version_kind). Three language groups: language counts an addon "
+        "once for every language it contains, in the GitHub repo or the AnkiWeb package, data formats included, so "
+        "the counts add up to more than the addon total; a count equals the matches of the language filter of "
+        "filter_addons. primary_language (the GitHub repo's main language) and package_language (the main language "
+        "of the AnkiWeb package, which covers far more addons) count each addon once, under its main language only. "
+        "'(none)' counts addons without a value. distinct_values gives the number of groups; raise top_values to "
+        "list them all."))
     def get_statistics(group_by: list[GroupField] | None = None,
                        top_values: Annotated[int, Field(ge=1, le=200)] = 20,
                        snapshot: Snapshot = "latest") -> Statistics:

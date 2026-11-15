@@ -79,6 +79,12 @@ _SORT_EXPR = {
     SortField.ANKI_VERSION: "anki_point_version",
 }
 
+# Every language of the GitHub repo or the newest package, each once; mirrors AddonDetails.languages.
+_LANGUAGES = ("list_distinct(list_filter("
+              "list_transform(coalesce(github_language_bytes, []), lambda x: x.name) || [github_primary_language] "
+              "|| list_transform(coalesce(package.language_bytes, []), lambda x: x.name), "
+              "lambda x: coalesce(x, '') <> ''))")
+
 _SCALAR_GROUPS = {
     GroupField.LICENSE: "license",
     GroupField.PRIMARY_LANGUAGE: "github_primary_language",
@@ -90,6 +96,7 @@ _SCALAR_GROUPS = {
 }
 
 _LIST_GROUPS = {
+    GroupField.LANGUAGE: _LANGUAGES,
     GroupField.GITHUB_TOPIC: "github_topics",
     GroupField.AI_DECLARATION_MARKER: "ai_declaration_markers",
     GroupField.AI_TOOLING_MARKER: "github_ai_tooling_markers",
@@ -164,11 +171,8 @@ def _github_filters(f: AddonFilters, add: _Add) -> None:
 
 
 def _language_filters(f: AddonFilters, add: _Add) -> None:
-    if f.language is not None:
-        add("(list_contains(list_transform(github_language_bytes, lambda x: lower(x.name)), lower(?))"
-            " OR lower(github_primary_language) = lower(?)"
-            " OR list_contains(list_transform(package.language_bytes, lambda x: lower(x.name)), lower(?)))",
-            f.language, f.language, f.language)
+    if f.language:
+        add(f"list_has_all(list_transform({_LANGUAGES}, lambda x: lower(x)), ?)", _lower_all(f.language))
     if f.primary_language is not None:
         add("lower(primary_language) = lower(?)", f.primary_language)
 

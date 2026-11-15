@@ -45,7 +45,7 @@ package, else of the GitHub repo.
 |---|---|
 | `get_addon_history` | Follow one addon's rating, likes, stars, update date and Anki version across snapshots |
 | `diff_snapshots` | See added, removed and updated addons and the biggest rating and star changes between two snapshots |
-| `get_statistics` | Count addons, optionally grouped by license (the resolved one, see [Licenses](dataset-notes.md#licenses)), repo or package language, description language, AI tag, Anki version or its kind, update year, GitHub topic, AI markers |
+| `get_statistics` | Count addons, optionally grouped by license (the resolved one, see [Licenses](dataset-notes.md#licenses)), every contained language (an addon counts once per language), the repo's or the package's main language, description language, AI tag, Anki version or its kind, update year, GitHub topic, AI markers |
 
 ### Lookups
 
@@ -73,7 +73,7 @@ schemas.
 |---|---|
 | `min_rating`, `min_likes`, `min_stars` | with at least this many AnkiWeb votes, likes or GitHub stars |
 | `has_github`, `has_tests`, `has_forum` | with a GitHub repo, tests or an Anki Forum topic |
-| `language` | with this language anywhere in the GitHub repo or the package, bundled libraries and data formats included, case-insensitive, e.g. `JavaScript` |
+| `language` | with all these languages anywhere in the GitHub repo or the package, bundled libraries and data formats included, case-insensitive, e.g. `["Python", "JavaScript"]` or one name |
 | `primary_language` | mainly written in this language, as the cards' `primary_language` (the newest package's, else the GitHub repo's), case-insensitive, e.g. `Python` |
 | `description_language` | whose description is in this language (ISO code) |
 | `compatible_with_anki` | that support this Anki version |

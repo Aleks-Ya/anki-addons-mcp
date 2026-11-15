@@ -369,6 +369,10 @@ def test_find_text_no_match(repository: AddonRepository) -> None:
     (AddonFilters(has_forum=True), {KANJI, OCCLUSION}),
     (AddonFilters(language="javascript"), {OCCLUSION}),
     (AddonFilters(language="HANDLEBARS"), {KANJI}),
+    # Several languages must all be found, in the repo or the package.
+    (AddonFilters(language=["python", "JAVASCRIPT"]), {OCCLUSION}),
+    (AddonFilters(language=["Python", "Handlebars", "json"]), {KANJI}),
+    (AddonFilters(language=["JavaScript", "Handlebars"]), set()),
     # OCCLUSION's repo lists JavaScript, but its package is mainly Python.
     (AddonFilters(primary_language="JAVASCRIPT"), set()),
     (AddonFilters(primary_language="python"), {KANJI, OCCLUSION, HEATMAP, LEGACY, VIBE, NEW_ADDON, SAME_AUTHOR}),
@@ -524,6 +528,22 @@ def test_group_counts(repository: AddonRepository) -> None:
     assert repository.group_counts(GroupField.ANKI_VERSION)[NONE_GROUP] == 1
     assert repository.group_counts(GroupField.ANKI_VERSION_KIND) == {"tested": 6, "hard": 1, "unknown": 1}
     assert repository.group_counts(GroupField.PACKAGE_LANGUAGE) == {"Python": 2, NONE_GROUP: 6}
+
+
+def test_group_counts_by_language(repository: AddonRepository) -> None:
+    # Each addon counts once per language it contains: KANJI under three, OCCLUSION under two.
+    assert repository.group_counts(GroupField.LANGUAGE) == {
+        "Python": 7, "JavaScript": 1, "JSON": 1, "Handlebars": 1, NONE_GROUP: 1}
+    assert repository.group_counts(GroupField.LANGUAGE, OLD) == {"Python": 6, "JavaScript": 1, NONE_GROUP: 2}
+
+
+@pytest.mark.parametrize("snapshot", [LATEST, OLD])
+def test_language_group_counts_match_language_filter(repository: AddonRepository, snapshot: date) -> None:
+    counts = repository.group_counts(GroupField.LANGUAGE, snapshot)
+    for language, count in counts.items():
+        if language != NONE_GROUP:
+            query = AddonQuery(filters=AddonFilters(language=[language]), limit=None)
+            assert repository.find(query, snapshot).total == count, language
 
 
 def test_documentation(repository: AddonRepository) -> None:

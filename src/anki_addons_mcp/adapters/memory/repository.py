@@ -96,13 +96,8 @@ def _github_checks(gh: GithubInfo | None, f: AddonFilters) -> list[bool]:
 
 def _language_checks(d: AddonDetails, f: AddonFilters) -> list[bool]:
     checks: list[bool] = []
-    if f.language is not None:
-        language = f.language.lower()
-        gh = d.github
-        in_github = gh is not None and (language in [lb.name.lower() for lb in gh.language_bytes]
-                                        or _lower(gh.primary_language) == language)
-        in_package = d.package is not None and language in [lb.name.lower() for lb in d.package.language_bytes]
-        checks.append(in_github or in_package)
+    if f.language:
+        checks.append({x.lower() for x in f.language} <= {x.lower() for x in d.languages()})
     if f.primary_language is not None:
         checks.append(_lower(d.primary_language()) == f.primary_language.lower())
     return checks
@@ -170,6 +165,7 @@ def _sort_value(d: AddonDetails, field: SortField, score: float | None) -> Any:
 
 _GROUP_VALUES: dict[GroupField, Callable[[AddonDetails], list[str | None]]] = {
     GroupField.LICENSE: lambda d: [d.license.spdx_id if d.license else None],
+    GroupField.LANGUAGE: lambda d: list(d.languages()) or [None],
     GroupField.PRIMARY_LANGUAGE: lambda d: [d.github.primary_language if d.github else None],
     GroupField.PACKAGE_LANGUAGE: lambda d: [d.package.primary_language if d.package else None],
     GroupField.DESCRIPTION_LANGUAGE: lambda d: [d.anki_web.description_language],
