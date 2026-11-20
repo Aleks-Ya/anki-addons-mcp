@@ -389,6 +389,22 @@ class AddonDetails(BaseModel):
         return self.model_copy(update={"description": None, "description_html": None, "readme": None})
 
 
+class AiDevelopment(BaseModel):
+    tooling: list[str] = Field(
+        default_factory=list, exclude_if=lambda v: not v,
+        description="AI coding tool traces found in the GitHub repo, e.g. claude-code, agents-md, cursor")
+    declaration: list[str] = Field(
+        default_factory=list, exclude_if=lambda v: not v,
+        description="AI-usage words matched in the AnkiWeb description, e.g. vibe-coded, claude")
+
+    @classmethod
+    def of(cls, tooling: list[str], declaration: list[str]) -> "AiDevelopment | None":
+        """None without evidence, so cards of such addons keep their old shape."""
+        if not tooling and not declaration:
+            return None
+        return cls(tooling=tooling, declaration=declaration)
+
+
 class AddonCard(BaseModel):
     id: int
     title: str
@@ -413,6 +429,11 @@ class AddonCard(BaseModel):
                                   "excluded), else of the GitHub repo; GitHub Linguist names such as Python")
     forum_posts_count: int | None = None
     ai_tags: list[str] = Field(default_factory=list, description=AI_PROVENANCE)
+    ai_development: AiDevelopment | None = Field(
+        default=None, exclude_if=lambda v: v is None,
+        description="Evidence of AI-assisted development: the signals found (tooling in the GitHub repo, "
+                    "declaration in the AnkiWeb description) with the matched tools or words; pattern matches, "
+                    "not proof. Omitted without evidence")
     author_id: int | None = Field(default=None, description=AUTHOR_ID_DESCRIPTION)
     forked_from: int | None = Field(default=None, description="Addon this one was forked from")
     forks: list[int] = Field(default_factory=list, description="Addons forked from this one")
@@ -449,6 +470,8 @@ class AddonCard(BaseModel):
             primary_language=details.primary_language(),
             forum_posts_count=details.forum.posts_count if details.forum else None,
             ai_tags=list(details.ai.tags) if details.ai else [],
+            ai_development=AiDevelopment.of(list(github.ai_tooling_markers) if github else [],
+                                            list(details.anki_web.ai_declaration_markers)),
             author_id=details.author.id if details.author else None,
             forked_from=details.forked_from.id if details.forked_from else None,
             forks=list(details.forks),

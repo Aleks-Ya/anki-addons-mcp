@@ -19,7 +19,10 @@ see [Dataset notes](dataset-notes.md).
 | `top_addons` | Leaderboard by rating, likes, stars, forum posts or recency, optionally within one AI tag |
 
 These tools return compact addon cards. A card's `primary_language` is the main programming language of the newest
-package, else of the GitHub repo.
+package, else of the GitHub repo. A card's `ai_development` shows evidence of AI-assisted development: `tooling` lists
+the AI coding tool traces found in the GitHub repo (e.g. `claude-code`, `agents-md`), `declaration` the AI-usage words
+matched in the AnkiWeb description (e.g. `vibe-coded`); each appears only when found, and cards without evidence omit
+`ai_development`.
 
 ### Inspect one addon
 

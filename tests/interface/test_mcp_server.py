@@ -6,9 +6,10 @@ import pytest
 from mcp import Client
 
 from anki_addons_mcp.application.services import build_services
+from anki_addons_mcp.domain.models import AiDevelopment
 from anki_addons_mcp.domain.ports import AddonRepository
 from anki_addons_mcp.interface.mcp.server import build_server
-from tests.fixtures.dataset import HEATMAP, KANJI, NEW_ADDON, NO_GITHUB, OCCLUSION, OLD, SAME_AUTHOR
+from tests.fixtures.dataset import HEATMAP, KANJI, NEW_ADDON, NO_GITHUB, OCCLUSION, OLD, SAME_AUTHOR, VIBE
 
 pytestmark = pytest.mark.anyio
 
@@ -99,6 +100,25 @@ async def test_filter(client: Client) -> None:
     page = await call(client, "filter_addons", has_tests=True, sort_by="stars", limit=5)
     assert [item["id"] for item in page["items"]] == [OCCLUSION, KANJI]
     assert page["total"] == 2
+
+
+async def test_cards_show_ai_development_only_with_evidence(client: Client) -> None:
+    page = await call(client, "filter_addons", limit=100)
+    by_id = {item["id"]: item for item in page["items"]}
+    assert by_id[VIBE]["ai_development"] == {"tooling": ["claude-code", "agents-md"],
+                                             "declaration": ["claude", "vibe-coded"]}
+    assert [i for i, item in by_id.items() if "ai_development" in item] == [VIBE]
+    tool = next(t for t in (await client.list_tools()).tools if t.name == "filter_addons")
+    card_schema = tool.output_schema["$defs"]["AddonCard"]
+    assert "ai_development" in card_schema["properties"]
+    assert "ai_development" not in card_schema.get("required", [])
+
+
+async def test_ai_development_omits_the_signal_not_found() -> None:
+    assert AiDevelopment.of([], []) is None
+    found = AiDevelopment.of([], ["vibe-coded"])
+    assert found is not None
+    assert found.model_dump(mode="json") == {"declaration": ["vibe-coded"]}
 
 
 async def test_filter_by_several_languages(client: Client) -> None:

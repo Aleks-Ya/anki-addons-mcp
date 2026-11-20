@@ -7,6 +7,7 @@ from anki_addons_mcp.domain.models import (
     AddonCard,
     AddonDetails,
     AddonLicense,
+    AiDevelopment,
     AiInfo,
     AnkiWebInfo,
     AnkiWebLink,
@@ -29,7 +30,8 @@ CARD_COLUMNS = [
     "id", "title", "url", "rating", "likes", "dislikes", "update_date", "anki_version", "anki_point_version",
     "anki_version_kind", "ai_summary",
     "github_user", "github_repo", "github_stars", "github_last_commit", "github_archived", "license",
-    "license_source", "primary_language", "forum_posts_count", "ai_tags", "author_id",
+    "license_source", "primary_language", "forum_posts_count", "ai_tags", "github_ai_tooling_markers",
+    "ai_declaration_markers", "author_id",
     "forked_from", "forks", "duplicate_of", "duplicates",
 ]
 
@@ -68,6 +70,7 @@ def row_to_card(row: dict[str, Any], score: float | None = None) -> AddonCard:
         license=row["license"], license_source=row["license_source"], primary_language=row["primary_language"],
         forum_posts_count=row["forum_posts_count"],
         ai_tags=_list(row["ai_tags"]),
+        ai_development=AiDevelopment.of(_list(row["github_ai_tooling_markers"]), _list(row["ai_declaration_markers"])),
         author_id=row["author_id"], forked_from=row["forked_from"]["id"] if row["forked_from"] else None,
         forks=_list(row["forks"]), duplicate_of=row["duplicate_of"]["id"] if row["duplicate_of"] else None,
         duplicates=_list(row["duplicates"]), score=score,

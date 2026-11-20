@@ -30,6 +30,9 @@ Anki Forum and AI-summary and AI-tag data, published as monthly snapshots.
   rated one counting as the original. is_duplicate=False in search_addons and filter_addons hides the copies.
 - Addons carry AI tags from a fixed vocabulary (list_tags): function tags (what an addon does) and status
   tags (obsolete, paid, beta, ...). Filter with tags/exclude_tags in search_addons and filter_addons.
+- ai_development on a card is evidence of AI-assisted development: tooling (AI coding tool traces in the GitHub
+  repo) and declaration (AI-usage words in the AnkiWeb description), with what matched; omitted without evidence.
+  Filter with has_ai_tooling/has_ai_declaration. The markers are pattern matches, not proof.
 - list_anki_versions lists the real Anki releases of a snapshot, newest first: use it to check a version a user
   mentions or to find the latest Anki before check_compatibility or the compatible_with_anki filter.
 - Every data tool takes an optional snapshot (YYYY-MM-DD from list_snapshots, default latest);

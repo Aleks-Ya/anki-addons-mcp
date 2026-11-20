@@ -8,6 +8,7 @@ from anki_addons_mcp.domain.errors import InvalidQuery, SnapshotNotFound
 from anki_addons_mcp.domain.models import (
     NONE_GROUP,
     AddonLicense,
+    AiDevelopment,
     DuplicateEvidence,
     ForkEvidence,
     GroupField,
@@ -454,12 +455,16 @@ def test_card_fields(repository: AddonRepository) -> None:
     assert (card.license, card.license_source) == ("MIT", "package_file")
     assert card.forum_posts_count == 30
     assert "ai_model" not in card.model_dump()
+    assert card.ai_development is None
     no_github = repository.find(AddonQuery(filters=AddonFilters(addon_ids=[NO_GITHUB]))).items[0]
     assert no_github.anki_version is None
     assert no_github.github_stars is None
     assert no_github.anki_point_version is None
     assert no_github.anki_version_kind == VersionKind.UNKNOWN
     assert (card.anki_point_version, card.anki_version_kind) == (250200, VersionKind.TESTED)
+    vibe = repository.find(AddonQuery(filters=AddonFilters(addon_ids=[VIBE]))).items[0]
+    assert vibe.ai_development == AiDevelopment(tooling=["claude-code", "agents-md"],
+                                                declaration=["claude", "vibe-coded"])
 
 
 def test_parsed_versions_in_details(repository: AddonRepository) -> None:
