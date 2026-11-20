@@ -56,6 +56,31 @@ async def test_output_schemas_have_no_date_time_format(client: Client) -> None:
     assert offending == []
 
 
+def _unportable_subschemas(schema: Any, path: str) -> list[str]:
+    """Paths of subschemas strict clients warn about: {} accepts any value, and a list of types doesn't map onto
+    single-type schema dialects."""
+    if not isinstance(schema, dict):
+        return []
+    if not schema or isinstance(schema.get("type"), list):
+        return [path]
+    found = []
+    for key in ("properties", "$defs"):
+        for name, sub in schema.get(key, {}).items():
+            found += _unportable_subschemas(sub, f"{path}.{key}.{name}")
+    for key in ("items", "additionalProperties"):
+        found += _unportable_subschemas(schema.get(key), f"{path}.{key}")
+    for key in ("anyOf", "oneOf", "allOf"):
+        for i, sub in enumerate(schema.get(key, [])):
+            found += _unportable_subschemas(sub, f"{path}.{key}[{i}]")
+    return found
+
+
+async def test_output_schemas_are_portable(client: Client) -> None:
+    offending = [path for tool in (await client.list_tools()).tools
+                 for path in _unportable_subschemas(tool.output_schema, tool.name)]
+    assert offending == []
+
+
 async def test_list_snapshots_keeps_the_timestamp_as_published(client: Client) -> None:
     snapshots = (await call(client, "list_snapshots"))["result"]
     assert snapshots[1]["report_generation_date"] == "2026-10-01T09:30:27"

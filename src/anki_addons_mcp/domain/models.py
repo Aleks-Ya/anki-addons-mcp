@@ -3,7 +3,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Annotated, Any
 
-from pydantic import BaseModel, BeforeValidator, Field, computed_field, field_validator
+from pydantic import BaseModel, BeforeValidator, Field, WithJsonSchema, computed_field, field_validator
 
 AI_PROVENANCE = "LLM-generated summary and tags; may contain mistakes. Verify against the description or README."
 APPROVAL_DESCRIPTION = ("Share of likes among AnkiWeb votes, as the 95% Wilson lower bound (0..1): "
@@ -579,8 +579,15 @@ class GroupField(StrEnum):
 NONE_GROUP = "(none)"
 
 
+# A bare {} schema accepts anything and strict clients warn about it, so the cell's JSON types are spelled out.
+SqlCell = Annotated[Any, WithJsonSchema({
+    "anyOf": [{"type": t} for t in ("string", "number", "boolean", "null", "array", "object")],
+    "description": "A column value: arrays for LIST and objects for STRUCT columns, dates as ISO strings",
+})]
+
+
 class SqlResult(BaseModel):
     columns: list[str]
-    rows: list[list[Any]]
+    rows: list[list[SqlCell]]
     row_count: int
     truncated: bool
