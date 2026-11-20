@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(git push origin main)",
-      "Bash(git push space main)"
+      "Bash(git push space main)",
+      "Bash(uv run anki-addons-mcp:*)",
+      "Bash(curl -s http://localhost:*)",
+      "Bash(npx -y @modelcontextprotocol/inspector:*)"
     ]
   }
 }
