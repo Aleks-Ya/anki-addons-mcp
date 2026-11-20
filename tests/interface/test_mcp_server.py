@@ -78,6 +78,14 @@ async def test_search(client: Client) -> None:
     assert {item["id"] for item in page["items"]} == {KANJI, NEW_ADDON}
 
 
+async def test_search_sorted(client: Client) -> None:
+    newest = await call(client, "search_addons", query="kanji", sort_by="update_date")
+    assert [item["id"] for item in newest["items"]] == [NEW_ADDON, KANJI]
+    oldest = await call(client, "search_addons", query="kanji", sort_by="update_date", descending=False, limit=1)
+    assert [item["id"] for item in oldest["items"]] == [KANJI]
+    assert oldest["total"] == 2
+
+
 async def test_search_with_filters(client: Client) -> None:
     tested = await call(client, "search_addons", query="kanji", has_tests=True)
     assert [item["id"] for item in tested["items"]] == [KANJI]

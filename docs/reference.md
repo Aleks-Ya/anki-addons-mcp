@@ -12,7 +12,7 @@ see [Dataset notes](dataset-notes.md).
 
 | Tool | Use it to |
 |---|---|
-| `search_addons` | Full-text search over titles, descriptions, AI summaries and tags, GitHub topics; accepts every filter of `filter_addons` |
+| `search_addons` | Full-text search over titles, descriptions, AI summaries and tags, GitHub topics, ranked by relevance or by any `filter_addons` sort; accepts every filter of `filter_addons` |
 | `filter_addons` | Structured query with [filters](#filters), sorted by rating (approval), likes, stars, update date, last commit, forum posts or `anki_version` |
 | `find_similar_addons` | Find addons similar to a given one: shared wording, topics, AI tags, author, fork relation, copies or a shared GitHub repo |
 | `list_addons_by_author` | List the addons of a GitHub user, or of an AnkiWeb author by `author_id` or by any of their addons (`addon_id`) |

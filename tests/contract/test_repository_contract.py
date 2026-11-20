@@ -414,6 +414,20 @@ def test_find_text_and_filter(repository: AddonRepository) -> None:
     assert ids(repository, AddonQuery(text="kanji", filters=AddonFilters(min_rating=50))) == [KANJI]
 
 
+def test_find_text_sorted_by_other_field(repository: AddonRepository) -> None:
+    newest = AddonQuery(text="kanji", sort=SortField.UPDATE_DATE, limit=None)
+    assert ids(repository, newest) == [NEW_ADDON, KANJI]
+    assert ids(repository, newest.model_copy(update={"descending": False})) == [KANJI, NEW_ADDON]
+    assert all(c.score is not None for c in repository.find(newest).items)
+
+
+def test_find_text_sorted_paging(repository: AddonRepository) -> None:
+    pages = [repository.find(AddonQuery(text="kanji", sort=SortField.UPDATE_DATE, limit=1, offset=offset))
+             for offset in (0, 1)]
+    assert [c.id for page in pages for c in page.items] == [NEW_ADDON, KANJI]
+    assert [page.total for page in pages] == [2, 2]
+
+
 @pytest.mark.parametrize(("sort", "first"), [
     (SortField.STARS, OCCLUSION),
     (SortField.LIKES, OCCLUSION),

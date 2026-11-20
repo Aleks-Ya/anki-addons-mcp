@@ -62,13 +62,13 @@ class CatalogService:
 
     def search(
         self, text: str, limit: int = 20, offset: int = 0, filters: AddonFilters | None = None,
-        snapshot: date | None = None,
+        snapshot: date | None = None, sort: SortField = SortField.RELEVANCE, descending: bool = True,
     ) -> Page[AddonCard]:
         if not text.strip():
             raise InvalidQuery("query must not be empty")
         filters = filters or AddonFilters()
         self._tags.validate_filters(filters, snapshot)
-        query = AddonQuery(text=text, filters=filters, sort=SortField.RELEVANCE,
+        query = AddonQuery(text=text, filters=filters, sort=sort, descending=descending,
                            offset=offset, limit=check_limit(limit))
         return self._repository.find(query, snapshot)
 

@@ -91,8 +91,11 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Full-text search over addon titles, AnkiWeb descriptions, AI summaries and tags, GitHub topics and "
-        "repo descriptions. Returns compact addon cards ranked by relevance. Accepts every filter of "
-        "filter_addons; filters are combined with the query with AND."))
+        "repo descriptions. Returns compact addon cards and the total number of matches, ranked by relevance "
+        "by default (sort_by=relevance). sort_by and descending take the same values as in filter_addons (rating, "
+        "likes, stars, update_date, last_commit, forum_posts, anki_version), e.g. to list the matches by rating "
+        "or newest first; each card keeps its relevance score. Accepts every filter of filter_addons; filters are "
+        "combined with the query with AND."))
     def search_addons(
         query: Annotated[str, Field(description="Search words, e.g. 'image occlusion'")],  # NOSONAR - flat MCP tool parameters
         min_rating: int | None = None, min_likes: int | None = None, min_stars: int | None = None,
@@ -107,11 +110,12 @@ def register_tools(mcp: MCPServer, services: Services) -> None:
         is_duplicate: IsDuplicate = None, has_duplicates: HasDuplicates = None, duplicate_of: DuplicateOf = None,
         has_ai_declaration: HasAiDeclaration = None, has_ai_tooling: HasAiTooling = None,
         tags: Tags = None, exclude_tags: ExcludeTags = None,
+        sort_by: SortField = SortField.RELEVANCE, descending: bool = True,
         limit: Limit = 20, offset: Offset = 0, snapshot: Snapshot = "latest",
     ) -> Page[AddonCard]:
         with tool_errors():
             filters = _filters(locals())
-            return catalog.search(query, limit, offset, filters, parse_snapshot(snapshot))
+            return catalog.search(query, limit, offset, filters, parse_snapshot(snapshot), sort_by, descending)
 
     @mcp.tool(annotations=READ_ONLY, description=(
         "Structured addon query. All filters are optional and combined with AND; the list filters language and "
